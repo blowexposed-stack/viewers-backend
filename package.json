@@ -1,0 +1,67 @@
+'use strict';
+
+// ─── Carrega variáveis de ambiente ANTES de qualquer import ───────────────────
+require('dotenv').config();
+
+const http      = require('http');
+const app       = require('./app');
+const connectDB = require('./config/database');
+const logger    = require('./utils/logger');
+const { initAndStore } = require('./events/socket');
+const { startJobs }    = require('./jobs/scheduler');
+
+const PORT = process.env.PORT || 3000;
+
+// ─── Conecta ao banco e sobe o servidor ───────────────────────────────────────
+async function startServer() {
+  try {
+    await connectDB();
+
+    // Cria servidor HTTP (necessário para Socket.IO)
+    const server = http.createServer(app);
+
+    // Inicializa WebSocket
+    const io = initAndStore(server);
+
+    // Armazena io na app para uso nos controllers
+    app.set('io', io);
+
+    // Inicia background jobs (viewer counts, cleanup, etc.)
+    startJobs(io);
+
+    server.listen(PORT, () => {
+      logger.info(`🚀 Servidor rodando na porta ${PORT} [${process.env.NODE_ENV}]`);
+      logger.info(`🔌 WebSocket ativo em ws://localhost:${PORT}`);
+    });
+
+    // ─── Graceful shutdown ───────────────────────────────────────────────────
+    const shutdown = (signal) => {
+      logger.info(`${signal} recebido. Encerrando servidor...`);
+      server.close(() => {
+        logger.info('Servidor encerrado com sucesso.');
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 10_000);
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
+
+  } catch (err) {
+    logger.error('Falha ao iniciar o servidor:', err);
+    process.exit(1);
+  }
+}
+
+// ─── Captura exceções não tratadas ───────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  logger.error('UncaughtException:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('UnhandledRejection:', reason);
+  process.exit(1);
+});
+
+startServer();
