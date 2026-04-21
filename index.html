@@ -889,14 +889,42 @@ async function api(method, path, body) {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
   };
-  if (STATE.token) opts.headers['Authorization'] = `Bearer ${STATE.token}`;
-  if (body) opts.body = JSON.stringify(body);
 
-  const res = await fetch(API + path, opts);
-  const data = await res.json();
+  // 1. Verifica se o token existe no seu estado global (STATE)
+  if (typeof STATE !== 'undefined' && STATE.token) {
+    opts.headers['Authorization'] = `Bearer ${STATE.token}`;
+  }
 
-  if (!res.ok) throw new Error(data.message || 'Erro desconhecido');
-  return data;
+  // 2. Só envia o corpo se houver dados e não for uma requisição GET
+  if (body && method !== 'GET') {
+    opts.body = JSON.stringify(body);
+  }
+
+  try {
+    const res = await fetch(API + path, opts);
+
+    // 3. Verifica se a resposta é JSON antes de tentar ler
+    const contentType = res.headers.get("content-type");
+    let data = null;
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json();
+    }
+
+    // 4. Se o status não for 200-299, lança o erro do backend
+    if (!res.ok) {
+      throw new Error(data?.message || `Erro ${res.status}: ${res.statusText}`);
+    }
+
+    return data;
+  } catch (err) {
+    // 5. Se der "Failed to fetch", o erro cairá aqui
+    console.error("--- ERRO NA CHAMADA API ---");
+    console.error("Caminho:", API + path);
+    console.error("Detalhe:", err.message);
+    
+    // Relança o erro para o seu formulário tratar (mostrar alerta, etc)
+    throw err;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
