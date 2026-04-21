@@ -1,38 +1,37 @@
 'use strict';
 
+// 1. Carrega as variáveis de ambiente do arquivo .env ou do painel do Render
+require('dotenv').config();
+
+const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
 
-const streamerSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      unique: true,
-    },
-    isLive: { type: Boolean, default: false },
-    streamTitle: {
-      type: String,
-      trim: true,
-      maxlength: [120, 'Título muito longo.'],
-    },
-    game: {
-      type: String,
-      trim: true,
-      maxlength: [60, 'Nome do jogo muito longo.'],
-    },
-    currentViewers: { type: Number, default: 0, min: 0 },
-    peakViewers:    { type: Number, default: 0, min: 0 },
-    totalHoursStreamed: { type: Number, default: 0 },
-    lastWentLive: Date,
-  },
-  {
-    timestamps: true,
-    versionKey: false,
-    toJSON: { virtuals: true },
-  }
-);
+// Importa o modelo que criamos (ajuste o caminho se o seu arquivo tiver outro nome)
+const Streamer = require('./models/Streamer'); 
 
-streamerSchema.index({ isLive: 1, currentViewers: -1 });
+const app = express();
 
-module.exports = mongoose.model('Streamer', streamerSchema);
+// --- MIDDLEWARES ---
+app.use(cors());
+app.use(express.json()); // Permite que o servidor entenda JSON no corpo das requisições
+
+// --- CONEXÃO COM O BANCO DE DADOS ---
+const MONGODB_URI = process.env.MONGODB_URI;
+
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ Conexão com MongoDB estabelecida com sucesso!'))
+  .catch(err => console.error('❌ Erro ao conectar ao MongoDB:', err));
+
+// --- ROTAS (Exemplo básico) ---
+app.get('/', (req, res) => {
+  res.send('API da Comunidade Viewrs está online!');
+});
+
+// --- INICIALIZAÇÃO DO SERVIDOR ---
+// O Render exige que você use process.env.PORT e o host '0.0.0.0'
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+});
