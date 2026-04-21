@@ -1,35 +1,42 @@
 'use strict';
 
-// 1. Carrega as variáveis de ambiente do arquivo .env ou do painel do Render
+// 1. Configurações iniciais e Variáveis de Ambiente
 require('dotenv').config();
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-// Importa o modelo que criamos (ajuste o caminho se o seu arquivo tiver outro nome)
-const Streamer = require('./models/Streamer'); 
+// 2. Importação do Modelo
+// Se o seu arquivo se chama Streamer.js e está na mesma pasta:
+const Streamer = require('./Streamer'); 
 
 const app = express();
 
-// --- MIDDLEWARES ---
+// 3. Middlewares
 app.use(cors());
-app.use(express.json()); // Permite que o servidor entenda JSON no corpo das requisições
+app.use(express.json());
 
-// --- CONEXÃO COM O BANCO DE DADOS ---
-const MONGODB_URI = process.env.MONGODB_URI;
+// 4. Conexão com o MongoDB
+// Certifique-se de que cadastrou MONGODB_URI no painel do Render!
+const mongoURI = process.env.MONGODB_URI;
 
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ Conexão com MongoDB estabelecida com sucesso!'))
-  .catch(err => console.error('❌ Erro ao conectar ao MongoDB:', err));
+if (!mongoURI) {
+  console.error('ERRO: A variável MONGODB_URI não foi definida nas configurações do Render!');
+}
 
-// --- ROTAS (Exemplo básico) ---
+mongoose.connect(mongoURI)
+  .then(() => console.log('✅ Conectado ao MongoDB com sucesso!'))
+  .catch(err => {
+    console.error('❌ Erro de conexão com o banco de dados:');
+    console.error(err);
+  });
+
+// 5. Rota de teste
 app.get('/', (req, res) => {
-  res.send('API da Comunidade Viewrs está online!');
+  res.status(200).json({ mensagem: 'API Comunidade Viewrs online!' });
 });
 
-// --- INICIALIZAÇÃO DO SERVIDOR ---
-// O Render exige que você use process.env.PORT e o host '0.0.0.0'
+// 6. Inicialização do Servidor (Configuração específica para Deploy)
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, '0.0.0.0', () => {
