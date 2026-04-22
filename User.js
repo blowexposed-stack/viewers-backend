@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Senha é obrigatória.'],
       minlength: [8, 'Senha deve ter no mínimo 8 caracteres.'],
-      select: false, // Nunca retorna a senha por padrão
+      select: false, 
     },
 
     role: {
@@ -45,7 +45,6 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     isEmailVerified: { type: Boolean, default: false },
 
-    // Tokens de segurança
     emailVerificationToken: { type: String, select: false },
     passwordResetToken:      { type: String, select: false },
     passwordResetExpires:    { type: Date,   select: false },
@@ -84,14 +83,14 @@ const userSchema = new mongoose.Schema(
     lockUntil: { type: Date, select: false },
   },
   {
-    timestamps: true,        // createdAt e updatedAt automáticos
+    timestamps: true,
     versionKey: false,
     toJSON: { virtuals: true, transform: sanitizeOutput },
     toObject: { virtuals: true },
   }
 );
 
-// ─── Remove campos sensíveis do JSON retornado ────────────────────────────────
+// ─── Sanitização: Remove campos sensíveis ─────────────────────────────────────
 function sanitizeOutput(_doc, ret) {
   delete ret.password;
   delete ret.emailVerificationToken;
@@ -100,11 +99,14 @@ function sanitizeOutput(_doc, ret) {
   delete ret.loginAttempts;
   delete ret.lockUntil;
   delete ret.lastLoginIp;
+  // O id do MongoDB já vem como virtual 'id', podemos remover o _id se quiser
+  delete ret._id;
   return ret;
 }
 
 // ─── Índices ─────────────────────────────────────────────────────────────────
-userSchema.index({ tokens: -1 }); // ranking
+// NOTA: 'email' e 'nickname' já são únicos via definição do campo acima.
+userSchema.index({ tokens: -1 }); // Otimiza ranking
 
 // ─── Virtual: está bloqueado? ─────────────────────────────────────────────────
 userSchema.virtual('isLocked').get(function () {
@@ -115,36 +117,37 @@ userSchema.virtual('isLocked').get(function () {
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
-  const rounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
-  this.password = await bcrypt.hash(this.password, rounds);
-  next();
+  try {
+    // Garante que 'rounds' seja um número válido para não crashar o Bcrypt
+    const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+    const salt = await bcrypt.genSalt(saltRounds);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
-// ─── Método: compara senha ────────────────────────────────────────────────────
+// ─── Métodos de Instância ─────────────────────────────────────────────────────
 userSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
-// ─── Método: incrementa tentativas de login ───────────────────────────────────
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME = 30 * 60 * 1000; // 30 min
 
 userSchema.methods.incrementLoginAttempts = async function () {
-  // Desbloqueia se o lockUntil expirou
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({ $set: { loginAttempts: 1 }, $unset: { lockUntil: 1 } });
   }
 
   const update = { $inc: { loginAttempts: 1 } };
-
   if (this.loginAttempts + 1 >= MAX_LOGIN_ATTEMPTS && !this.isLocked) {
     update.$set = { lockUntil: Date.now() + LOCK_TIME };
   }
-
   return this.updateOne(update);
 };
 
-// ─── Método: reseta tentativas após login bem-sucedido ───────────────────────
 userSchema.methods.resetLoginAttempts = function () {
   return this.updateOne({ $set: { loginAttempts: 0 }, $unset: { lockUntil: 1 } });
 };
