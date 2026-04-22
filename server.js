@@ -1,64 +1,60 @@
 'use strict';
 
-// Carrega variáveis de ambiente o mais cedo possível
 require('dotenv').config();
-
 const http = require('http');
-const app = require('./app');
-const connectDB = require('./database');
+const app = require('./app'); // Certifique-se que app.js está na mesma pasta
+const connectDB = require('./database'); // Certifique-se que database.js está na mesma pasta
 const logger = require('./logger');
 
 const PORT = process.env.PORT || 3000;
 
-// Função para desligamento suave (Graceful Shutdown)
+// Função para encerrar o servidor sem corromper dados
 function gracefulShutdown(server, signal) {
-  logger.info(`Recebido ${signal}. Encerrando servidor suavemente...`);
+  logger.info(`♻️ Recebido ${signal}. Encerrando processos...`);
   server.close(() => {
-    logger.info('Servidor HTTP fechado.');
-    // Aqui você pode fechar a conexão com o banco se o connectDB exportar o mongoose
+    logger.info('✅ Servidor HTTP encerrado.');
     process.exit(0);
   });
 
-  // Força a saída após 10 segundos se não fechar sozinho
+  // Força o fechamento após 10s se travar
   setTimeout(() => {
-    logger.error('Não foi possível fechar as conexões a tempo, forçando saída.');
+    logger.error('⚠️ Forçando encerramento por timeout.');
     process.exit(1);
   }, 10000);
 }
 
 async function startServer() {
   try {
-    // 1. Conecta ao Banco de Dados primeiro
+    // 1. Conecta ao MongoDB
     await connectDB();
-    logger.info('Conexão com o banco de dados estabelecida.');
+    logger.info('🐘 MongoDB conectado com sucesso.');
 
-    // 2. Cria o servidor
     const server = http.createServer(app);
 
-    // 3. Escuta na porta correta (Railway exige 0.0.0.0 para tráfego externo)
+    // 2. Escuta no host 0.0.0.0 (Obrigatório para Railway/Docker)
     server.listen(PORT, '0.0.0.0', () => {
-      logger.info(`🚀 Servidor rodando: http://0.0.0.0:${PORT} [${process.env.NODE_ENV || 'development'}]`);
+      logger.info(`🚀 App Online em: http://0.0.0.0:${PORT}`);
+      logger.info(`🛠️ Ambiente: ${process.env.NODE_ENV || 'development'}`);
     });
 
-    // 4. Tratamento de Sinais do Sistema (Crucial para Cloud)
+    // Gatilhos de desligamento
     process.on('SIGTERM', () => gracefulShutdown(server, 'SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown(server, 'SIGINT'));
 
   } catch (err) {
-    logger.error('❌ Erro crítico no startServer:', err.message);
-    // Dá um tempo para o logger registrar o erro antes de matar o processo
+    logger.error('❌ Falha crítica ao iniciar servidor:', err.message);
     setTimeout(() => process.exit(1), 1000);
   }
 }
 
-// Tratamento de erros globais (evita crash silencioso)
+// Captura de erros globais para evitar crash silencioso
 process.on('uncaughtException', (err) => {
-  logger.error('FALHA CRÍTICA (Uncaught Exception):', err);
+  logger.error('💥 Erro não tratado (Uncaught Exception):', err);
   setTimeout(() => process.exit(1), 1000);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('FALHA CRÍTICA (Unhandled Rejection) em:', promise, 'motivo:', reason);
+process.on('unhandledRejection', (reason) => {
+  logger.error('💥 Promessa rejeitada não tratada (Unhandled Rejection):', reason);
   setTimeout(() => process.exit(1), 1000);
 });
 
