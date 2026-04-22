@@ -104,8 +104,8 @@ function sanitizeOutput(_doc, ret) {
 }
 
 // ─── Índices ─────────────────────────────────────────────────────────────────
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ nickname: 1 }, { unique: true });
+// Note: email and nickname indexes are already created by `unique: true` in the
+// field definitions above — no need to call schema.index() for them again.
 userSchema.index({ tokens: -1 }); // ranking
 
 // ─── Virtual: está bloqueado? ─────────────────────────────────────────────────
