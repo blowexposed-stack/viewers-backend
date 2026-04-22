@@ -104,8 +104,6 @@ function sanitizeOutput(_doc, ret) {
 }
 
 // ─── Índices ─────────────────────────────────────────────────────────────────
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ nickname: 1 }, { unique: true });
 userSchema.index({ tokens: -1 }); // ranking
 
 // ─── Virtual: está bloqueado? ─────────────────────────────────────────────────
