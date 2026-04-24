@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comunidade Viewers — Viewers Reais para sua Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+:root {
+  --bg:     #0d0d0d;
+  --bg2:    #141414;
+  --bg3:    #1a1a1a;
+  --card:   #1e1e1e;
+  --card2:  #252525;
+  --border: #2e2e2e;
+  --border2:#3a3a3a;
+  --text:   #f2f2f2;
+  --text2:  #999;
+  --text3:  #555;
+  --purple: #7c3aed;
+  --purple2:#9d5cf7;
+  --purple3:#5b21b6;
+  --green:  #22c55e;
+  --red:    #ef4444;
+  --gold:   #f59e0b;
+  --cyan:   #06b6d4;
+  --orange: #f97316;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+
+/* ─── AUTH GATE ─────────────────────────────────────────────────── */
+#auth-gate{
+  display:none;position:fixed;inset:0;z-index:1000;
+  background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+  align-items:center;justify-content:center;padding:1rem;
+}
+#auth-gate.show{display:flex;}
+.gate-box{
+  background:var(--card);border:1px solid var(--border2);border-radius:16px;
+  padding:36px 32px;width:100%;max-width:420px;
+  animation:popIn .25s ease;
+}
+@keyframes popIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+.gate-logo{text-align:center;margin-bottom:24px;}
+.gate-logo-icon{
+  width:56px;height:56px;background:var(--purple);border-radius:14px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:26px;margin-bottom:10px;
+}
+.gate-logo-name{font-size:20px;font-weight:800;letter-spacing:-.5px;}
+.gate-logo-name span{color:var(--purple2);}
+.gate-tabs{display:flex;background:var(--bg3);border-radius:8px;padding:3px;margin-bottom:24px;}
+.gate-tab{flex:1;padding:8px;border:none;background:transparent;color:var(--text2);
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;
+  border-radius:6px;transition:all .15s;}
+.gate-tab.active{background:var(--purple);color:#fff;}
+.fg{margin-bottom:12px;}
+.fg label{display:block;font-size:11px;font-weight:600;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.fg input,.fg select{
+  width:100%;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:8px;padding:10px 14px;font-size:14px;
+  font-family:'Inter',sans-serif;color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+.fg input:focus,.fg select:focus{border-color:var(--purple);}
+.fg input::placeholder{color:var(--text3);}
+.fg select option{background:var(--bg3);}
+.plat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+.plat-opt{
+  background:var(--bg3);border:1px solid var(--border2);border-radius:8px;
+  padding:10px 4px;text-align:center;cursor:pointer;
+  font-size:10px;color:var(--text2);font-weight:600;transition:all .15s;
+  font-family:'Inter',sans-serif;
+}
+.plat-opt .pi{font-size:22px;display:block;margin-bottom:3px;}
+.plat-opt:hover,.plat-opt.sel{border-color:var(--purple);color:var(--purple2);background:rgba(124,58,237,.08);}
+.gate-err{font-size:12px;color:var(--red);margin-bottom:10px;display:none;padding:8px 12px;background:rgba(239,68,68,.08);border-radius:6px;}
+.gate-btn{
+  width:100%;padding:13px;background:var(--purple);border:none;border-radius:9px;
+  color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+}
+.gate-btn:hover{background:var(--purple2);}
+.gate-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* ─── LAYOUT ─────────────────────────────────────────────────────── */
+#app{display:none;}
+#app.show{display:flex;min-height:100vh;}
+
+/* ─── SIDEBAR ────────────────────────────────────────────────────── */
+.sidebar{
+  width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.sb-logo{padding:20px 16px;border-bottom:1px solid var(--border);}
+.sb-logo-wrap{display:flex;align-items:center;gap:10px;}
+.sb-logo-icon{
+  width:38px;height:38px;background:var(--purple);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  flex-shrink:0;
+}
+.sb-logo-name{font-size:14px;font-weight:800;letter-spacing:-.3px;line-height:1.2;}
+.sb-logo-name span{color:var(--purple2);}
+
+.sb-user{padding:14px 16px;border-bottom:1px solid var(--border);}
+.sb-avatar{
+  width:52px;height:52px;border-radius:50%;background:var(--purple);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;color:#fff;margin:0 auto 8px;
+}
+.sb-username{font-size:13px;font-weight:700;text-align:center;}
+.sb-plan{
+  display:inline-block;font-size:10px;font-weight:700;padding:2px 10px;
+  border-radius:10px;margin:4px auto 0;display:block;text-align:center;
+  width:fit-content;margin:4px auto 0;
+}
+.plan-free{background:rgba(153,153,153,.15);color:var(--text2);}
+.plan-starter{background:rgba(124,58,237,.2);color:var(--purple2);}
+.plan-pro{background:rgba(6,182,212,.15);color:var(--cyan);}
+.plan-elite{background:rgba(245,158,11,.15);color:var(--gold);}
+
+.sb-nav{padding:12px 10px;flex:1;}
+.sb-btn{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:11px 12px;border-radius:8px;margin-bottom:4px;
+  background:var(--purple);border:none;color:#fff;
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;text-align:left;
+}
+.sb-btn:hover{background:var(--purple2);}
+.sb-btn.active{background:var(--purple3);box-shadow:0 0 0 2px var(--purple);}
+.sb-btn .sb-icon{font-size:16px;flex-shrink:0;}
+.sb-btn .sb-badge{
+  margin-left:auto;font-size:10px;background:rgba(255,255,255,.2);
+  padding:2px 7px;border-radius:8px;
+}
+
+.sb-tokens{padding:12px 16px;border-top:1px solid var(--border);}
+.sb-token-box{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px;}
+.sb-token-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.sb-token-val{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--gold);}
+.sb-token-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+
+.sb-logout{
+  margin:0 10px 10px;padding:9px;background:transparent;
+  border:1px solid var(--border2);border-radius:8px;color:var(--text3);
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.sb-logout:hover{border-color:var(--red);color:var(--red);}
+
+/* ─── MAIN CONTENT ───────────────────────────────────────────────── */
+.main{flex:1;overflow:auto;}
+.page{display:none;padding:28px;}
+.page.active{display:block;}
+
+.page-title{
+  font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px;
+  display:flex;align-items:center;gap:10px;
+}
+.page-sub{font-size:13px;color:var(--text2);margin-bottom:24px;}
+
+/* ─── DASHBOARD ──────────────────────────────────────────────────── */
+.dash-welcome{
+  background:linear-gradient(135deg,var(--purple3),var(--purple));
+  border-radius:14px;padding:24px 28px;margin-bottom:24px;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+}
+.dash-avatar{
+  width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.dash-welcome h2{font-size:18px;font-weight:700;color:#fff;margin-bottom:4px;}
+.dash-welcome p{font-size:13px;color:rgba(255,255,255,.7);}
+
+.inventory-title{
+  background:var(--purple);color:#fff;padding:12px 20px;
+  border-radius:10px 10px 0 0;font-size:14px;font-weight:700;text-align:center;
+  margin-bottom:0;
+}
+.inventory-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:0;border:1px solid var(--border);border-radius:0 0 10px 10px;
+  overflow:hidden;margin-bottom:24px;
+}
+.inv-item{
+  padding:20px 24px;border-right:1px solid var(--border);
+  display:flex;align-items:center;gap:16px;background:var(--card);
+  transition:background .15s;
+}
+.inv-item:last-child{border-right:none;}
+.inv-item:hover{background:var(--card2);}
+.inv-icon{
+  width:52px;height:52px;border-radius:50%;background:var(--purple);
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  flex-shrink:0;
+}
+.inv-val{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--purple2);}
+.inv-label{font-size:13px;font-weight:600;margin-bottom:2px;}
+.inv-desc{font-size:11px;color:var(--text2);line-height:1.5;}
+.inv-link{color:var(--purple2);text-decoration:none;cursor:pointer;}
+
+.info-banner{
+  background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);
+  border-radius:10px;padding:14px 18px;margin-bottom:20px;
+  font-size:13px;color:#fca5a5;
+}
+.info-banner strong{color:var(--red);}
+
+/* ─── ASSISTIR PAGE ──────────────────────────────────────────────── */
+.watch-info-box{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px 24px;margin-bottom:24px;
+}
+.watch-info-box h3{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--purple2);}
+.watch-info-box p{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:6px;}
+.watch-info-box .warn{color:var(--red);font-weight:600;}
+
+.earn-table{width:100%;border-collapse:collapse;margin-top:12px;}
+.earn-table th{
+  background:var(--purple);color:#fff;padding:10px 16px;
+  font-size:12px;font-weight:600;text-align:left;
+}
+.earn-table td{
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  font-size:13px;
+}
+.earn-table tr:last-child td{border-bottom:none;}
+.earn-table .highlight{color:var(--purple2);font-weight:700;font-family:'JetBrains Mono',monospace;}
+.earn-table .plan-col{font-weight:600;}
+
+/* Watch session UI */
+.watch-session{display:none;margin-bottom:24px;}
+.watch-session.active{display:block;}
+.ws-header{
+  background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;
+  padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;
+}
+.ws-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.ws-live-tag{
+  background:var(--red);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:4px;animation:blink 1.4s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+.ws-stats{display:flex;gap:16px;flex-wrap:wrap;}
+.ws-stat{text-align:center;}
+.ws-stat-val{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--green);line-height:1;}
+.ws-stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+.ws-slots-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+  border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;
+  overflow:hidden;background:var(--card);
+}
+@media(max-width:800px){.ws-slots-grid{grid-template-columns:1fr;}}
+.ws-slot{border-right:1px solid var(--border);padding:16px;}
+.ws-slot:last-child{border-right:none;}
+.ws-slot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.ws-slot-name{font-size:13px;font-weight:700;}
+.ws-slot-plat{font-size:18px;}
+.ws-slot-timer{
+  font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:700;
+  color:var(--cyan);text-align:center;padding:16px 0;
+}
+.ws-slot-timer.urgent{color:var(--gold);animation:blink .8s infinite;}
+.ws-slot-prog{height:4px;background:var(--bg3);border-radius:4px;overflow:hidden;}
+.ws-slot-prog-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:4px;transition:width 1s linear;}
+.ws-slot-status{font-size:11px;color:var(--text3);text-align:center;margin-top:8px;}
+.ws-slot-earn{
+  font-size:12px;font-weight:700;color:var(--green);text-align:center;
+  margin-top:6px;opacity:0;transition:opacity .3s;
+}
+.ws-slot-earn.show{opacity:1;}
+.ws-slot-rotating{
+  text-align:center;padding:24px;color:var(--text3);font-size:13px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.spinner{
+  width:28px;height:28px;border:3px solid var(--border2);
+  border-top-color:var(--purple);border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.btn-watch-start{
+  padding:14px 32px;background:var(--purple);border:none;border-radius:10px;
+  color:#fff;font-family:'Inter',sans-serif;font-size:15px;font-weight:700;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;
+  margin:0 auto;
+}
+.btn-watch-start:hover{background:var(--purple2);transform:translateY(-1px);}
+.btn-watch-stop{
+  padding:10px 24px;background:transparent;border:1px solid rgba(239,68,68,.4);
+  border-radius:8px;color:var(--red);font-family:'Inter',sans-serif;
+  font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.btn-watch-stop:hover{background:rgba(239,68,68,.08);border-color:var(--red);}
+
+/* ─── MINHAS TRANSMISSÕES ────────────────────────────────────────── */
+.my-streams-header{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:16px 20px;margin-bottom:16px;
+}
+.my-streams-slot{font-size:14px;color:var(--text2);}
+.my-streams-slot strong{color:var(--purple2);}
+
+.streams-table-wrap{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;margin-bottom:20px;
+}
+.streams-table-head{
+  background:var(--purple);display:grid;
+  grid-template-columns:2fr 1fr 1fr 1fr 1.5fr auto;
+  padding:12px 20px;gap:16px;
+}
+.streams-table-head span{font-size:12px;font-weight:600;color:#fff;text-transform:uppercase;letter-spacing:.5px;}
+.streams-table-row{
+  display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1.5fr auto;
+  padding:16px 20px;gap:16px;align-items:center;
+  border-top:1px solid var(--border);
+}
+.stream-channel-info{display:flex;align-items:center;gap:12px;}
+.stream-plat-logo{font-size:28px;}
+.stream-channel-name{font-size:14px;font-weight:700;}
+.stream-edit-link{font-size:11px;color:var(--purple2);cursor:pointer;text-decoration:underline;}
+.stream-stat{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--text);}
+.stream-status-cell{display:flex;flex-direction:column;gap:6px;}
+.status-online{color:var(--green);font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;}
+.status-offline{color:var(--red);font-size:12px;font-weight:700;}
+.status-note{font-size:10px;color:var(--text3);}
+
+/* Toggle switch */
+.toggle-wrap{display:flex;align-items:center;gap:8px;}
+.toggle{position:relative;display:inline-block;width:48px;height:26px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{
+  position:absolute;cursor:pointer;inset:0;background:var(--border2);
+  border-radius:26px;transition:.3s;
+}
+.toggle-slider:before{
+  content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;
+  background:#fff;border-radius:50%;transition:.3s;
+}
+input:checked+.toggle-slider{background:var(--green);}
+input:checked+.toggle-slider:before{transform:translateX(22px);}
+.toggle-label{font-size:12px;font-weight:600;color:var(--text2);}
+
+.btn-delete{
+  background:transparent;border:1px solid rgba(239,68,68,.3);
+  color:var(--red);border-radius:6px;padding:6px 10px;cursor:pointer;
+  font-size:16px;transition:all .15s;
+}
+.btn-delete:hover{background:rgba(239,68,68,.1);}
+
+/* ASSD box */
+.assd-box{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px 24px;margin-bottom:16px;display:flex;align-items:center;
+  justify-content:space-between;gap:20px;flex-wrap:wrap;
+}
+.assd-info h4{font-size:14px;font-weight:700;margin-bottom:4px;}
+.assd-info p{font-size:12px;color:var(--text2);line-height:1.6;}
+.assd-info .warn{color:var(--gold);}
+
+/* Add stream form */
+.add-stream-box{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px 24px;margin-bottom:20px;
+}
+.add-stream-box h3{font-size:15px;font-weight:700;margin-bottom:16px;color:var(--purple2);}
+.add-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:600px){.add-form-grid{grid-template-columns:1fr;}}
+.btn-add-stream{
+  padding:11px 24px;background:var(--purple);border:none;border-radius:8px;
+  color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .15s;margin-top:8px;
+}
+.btn-add-stream:hover{background:var(--purple2);}
+
+/* ─── RANKING / STREAMS LIST ─────────────────────────────────────── */
+.streams-list-page{}
+.online-counter{
+  display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);
+  margin-bottom:16px;
+}
+.online-dot{
+  width:8px;height:8px;background:var(--green);border-radius:50%;
+  animation:blink 1.4s infinite;
+}
+.streams-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:14px;
+}
+.stream-card{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;transition:all .18s;cursor:pointer;
+}
+.stream-card:hover{border-color:var(--purple);transform:translateY(-2px);}
+.sc-thumb{
+  height:120px;background:var(--bg3);display:flex;
+  align-items:center;justify-content:center;font-size:42px;
+  position:relative;overflow:hidden;
+}
+.sc-live-tag{
+  position:absolute;top:8px;left:8px;background:var(--red);color:#fff;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;
+  animation:blink 1.4s infinite;
+}
+.sc-plat{position:absolute;top:8px;right:8px;font-size:20px;}
+.sc-body{padding:12px 14px;}
+.sc-name{font-size:14px;font-weight:700;margin-bottom:2px;}
+.sc-channel{font-size:12px;color:var(--purple2);font-weight:500;}
+.sc-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-top:1px solid var(--border);font-size:12px;
+}
+.sc-earn-badge{color:var(--green);font-weight:700;}
+.btn-watch{
+  background:var(--purple);color:#fff;border:none;border-radius:6px;
+  padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'Inter',sans-serif;transition:all .15s;
+}
+.btn-watch:hover{background:var(--purple2);}
+.empty-state{
+  grid-column:1/-1;text-align:center;padding:60px 20px;
+  color:var(--text3);
+}
+.empty-state .empty-icon{font-size:48px;margin-bottom:16px;opacity:.5;}
+.empty-state p{font-size:14px;line-height:1.6;}
+
+/* ─── PLANS PAGE ─────────────────────────────────────────────────── */
+.plans-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:16px;margin-top:20px;
+}
+.plan-card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:24px;position:relative;transition:border-color .2s;
+}
+.plan-card:hover{border-color:var(--purple);}
+.plan-card.featured{border-color:var(--purple);background:linear-gradient(160deg,var(--card2),var(--card));}
+.plan-featured-badge{
+  position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  background:var(--purple);color:#fff;font-size:10px;font-weight:700;
+  padding:3px 14px;border-radius:20px;white-space:nowrap;
+}
+.plan-name{font-size:16px;font-weight:800;margin-bottom:4px;}
+.plan-price{font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;margin-bottom:2px;}
+.plan-cycle{font-size:11px;color:var(--text3);margin-bottom:16px;}
+.plan-earn-box{
+  background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);
+  border-radius:8px;padding:10px 14px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.plan-earn-label{font-size:12px;color:var(--text2);}
+.plan-earn-val{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--purple2);font-size:15px;}
+.plan-features{list-style:none;margin-bottom:20px;}
+.plan-features li{
+  font-size:12px;color:var(--text2);padding:5px 0;
+  border-bottom:1px solid rgba(46,46,46,.5);
+  display:flex;align-items:center;gap:6px;
+}
+.plan-features li:last-child{border-bottom:none;}
+.plan-check{color:var(--green);font-weight:700;flex-shrink:0;}
+.plan-btn{
+  width:100%;padding:12px;background:var(--purple);border:none;border-radius:9px;
+  color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+}
+.plan-btn:hover{background:var(--purple2);}
+
+/* ─── PERFIL / CONFIGURACOES ─────────────────────────────────────── */
+.settings-section{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px 24px;margin-bottom:16px;
+}
+.settings-section h3{font-size:14px;font-weight:700;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;padding-bottom:12px;
+  border-bottom:1px solid var(--border);}
+.btn-save{
+  padding:10px 24px;background:var(--purple);border:none;border-radius:8px;
+  color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .15s;margin-top:8px;
+}
+.btn-save:hover{background:var(--purple2);}
+
+/* ─── TOAST ──────────────────────────────────────────────────────── */
+.toast{
+  position:fixed;bottom:20px;right:20px;z-index:2000;
+  background:var(--card2);border:1px solid var(--green);border-radius:10px;
+  padding:12px 18px;font-size:13px;color:var(--text);
+  display:none;align-items:center;gap:8px;
+  box-shadow:0 4px 20px rgba(34,197,94,.15);max-width:300px;
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.toast.show{display:flex;}
+.toast.err{border-color:var(--red);box-shadow:0 4px 20px rgba(239,68,68,.15);}
+
+/* ─── TOKEN FLOAT ────────────────────────────────────────────────── */
+.token-float{
+  position:fixed;pointer-events:none;z-index:3000;
+  font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;
+  color:var(--gold);text-shadow:0 0 10px rgba(245,158,11,.5);
+  animation:floatUp 2s ease-out forwards;
+}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-80px)}}
+
+/* ─── RESPONSIVE ─────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .sidebar{width:60px;}
+  .sb-logo-name,.sb-username,.sb-plan,.sb-btn span:not(.sb-icon),.sb-tokens,.sb-logout span{display:none;}
+  .sb-btn{padding:11px;justify-content:center;}
+  .sb-btn .sb-badge{display:none;}
+  .sb-user{padding:10px 4px;}
+  .sb-avatar{width:38px;height:38px;font-size:14px;}
+  .page{padding:16px;}
+  .streams-table-head,.streams-table-row{grid-template-columns:1fr 1fr auto;}
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH GATE -->
+<div id="auth-gate" class="show">
+  <div class="gate-box">
+    <div class="gate-logo">
+      <div class="gate-logo-icon">👁️</div>
+      <div class="gate-logo-name">Comunidade<span>Viewers</span></div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">Viewers reais para sua live</div>
+    </div>
+    <div class="gate-tabs">
+      <button class="gate-tab active" id="tab-login-btn" onclick="switchGateTab('login')">Entrar</button>
+      <button class="gate-tab" id="tab-reg-btn" onclick="switchGateTab('register')">Cadastrar</button>
+    </div>
+    <div id="gate-login-form">
+      <div class="fg"><label>E-mail</label><input type="email" id="g-email" placeholder="seu@email.com" autocomplete="email"></div>
+      <div class="fg"><label>Senha</label><input type="password" id="g-pass" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="gate-err" id="login-err"></div>
+      <button class="gate-btn" id="login-btn" onclick="doLogin()">Entrar</button>
+    </div>
+    <div id="gate-reg-form" style="display:none">
+      <div class="fg"><label>Nickname</label><input type="text" id="r-nick" placeholder="Seu apelido na comunidade" autocomplete="off"></div>
+      <div class="fg"><label>E-mail</label><input type="email" id="r-email" placeholder="seu@email.com" autocomplete="email"></div>
+      <div class="fg"><label>Senha</label><input type="password" id="r-pass" placeholder="Mín. 8 chars, 1 maiúscula, 1 número, 1 especial" autocomplete="new-password"></div>
+      <div class="fg"><label>Plataforma principal</label></div>
+      <div class="plat-grid">
+        <div class="plat-opt sel" onclick="selPlat(this,'twitch')"><span class="pi">💜</span>Twitch</div>
+        <div class="plat-opt" onclick="selPlat(this,'youtube')"><span class="pi">🔴</span>YouTube</div>
+        <div class="plat-opt" onclick="selPlat(this,'kick')"><span class="pi">🟢</span>Kick</div>
+        <div class="plat-opt" onclick="selPlat(this,'facebook')"><span class="pi">🔵</span>Facebook</div>
+      </div>
+      <div class="fg"><label>Nick do seu canal (para receber viewers)</label><input type="text" id="r-channel" placeholder="Ex: seucanal (sem @)" autocomplete="off"></div>
+      <div class="gate-err" id="reg-err"></div>
+      <button class="gate-btn" id="reg-btn" onclick="doRegister()">Criar conta grátis</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-wrap">
+        <div class="sb-logo-icon">👁️</div>
+        <div class="sb-logo-name">Comunidade<span>Viewers</span></div>
+      </div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sb-avatar">?</div>
+      <div class="sb-username" id="sb-username">Carregando...</div>
+      <div class="sb-plan plan-free" id="sb-plan">Sem plano</div>
+    </div>
+    <nav class="sb-nav">
+      <button class="sb-btn active" id="nav-dashboard" onclick="goTo('dashboard')">
+        <span class="sb-icon">🏠</span><span>Painel</span>
+      </button>
+      <button class="sb-btn" id="nav-assistir" onclick="goTo('assistir')">
+        <span class="sb-icon">📺</span><span>Assistir transmissões</span>
+      </button>
+      <button class="sb-btn" id="nav-minhas" onclick="goTo('minhas')">
+        <span class="sb-icon">📡</span><span>Minhas transmissões</span>
+      </button>
+      <button class="sb-btn" id="nav-lives" onclick="goTo('lives')">
+        <span class="sb-icon">🔴</span><span>Lives ao vivo</span><span class="sb-badge" id="lives-count">0</span>
+      </button>
+      <button class="sb-btn" id="nav-planos" onclick="goTo('planos')">
+        <span class="sb-icon">💎</span><span>Planos</span>
+      </button>
+      <button class="sb-btn" onclick="window.open('https://discord.gg/Mj3daxDc4K','_blank')"><span class="sb-icon">💬</span><span>Discord</span></button>
+      <button class="sb-btn" id="nav-perfil" onclick="goTo('perfil')">
+        <span class="sb-icon">⚙️</span><span>Configurações</span>
+      </button>
+    </nav>
+    <div class="sb-tokens">
+      <div class="sb-token-box">
+        <div class="sb-token-label">Seus Tokens</div>
+        <div class="sb-token-val" id="sb-tokens">0</div>
+        <div class="sb-token-sub" id="sb-token-rate">+2 por sessão</div>
+      </div>
+    </div>
+    <button class="sb-logout" onclick="logout()">🚪 <span>Sair</span></button>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="dash-welcome">
+        <div class="dash-avatar" id="dash-avatar">?</div>
+        <div>
+          <h2 id="dash-welcome-msg">Bem-vindo ao Painel!</h2>
+          <p>Assista transmissões para ganhar tokens e use-os para receber viewers na sua live.</p>
+        </div>
+      </div>
+      <div class="info-banner">
+        <strong>⚠️ ATENÇÃO:</strong> Em "Minhas Transmissões", cadastre seu canal e ative o status online para receber viewers da comunidade.
+      </div>
+      <div class="inventory-title">Inventário da sua conta</div>
+      <div class="inventory-grid">
+        <div class="inv-item">
+          <div class="inv-icon">🎯</div>
+          <div>
+            <div class="inv-val" id="inv-tokens">0</div>
+            <div class="inv-label">Tokens</div>
+            <div class="inv-desc">Usados para receber viewers na sua live.<br><a class="inv-link" onclick="goTo('assistir')">Ganhar tokens aqui</a></div>
+          </div>
+        </div>
+        <div class="inv-item">
+          <div class="inv-icon">⏱️</div>
+          <div>
+            <div class="inv-val" id="inv-minutes">0</div>
+            <div class="inv-label">Minutos assistidos</div>
+            <div class="inv-desc">Total de minutos assistindo lives da comunidade.</div>
+          </div>
+        </div>
+        <div class="inv-item">
+          <div class="inv-icon">👁️</div>
+          <div>
+            <div class="inv-val" id="inv-viewers">0</div>
+            <div class="inv-label">Viewers recebidos</div>
+            <div class="inv-desc">Total de viewers enviados para sua live.</div>
+          </div>
+        </div>
+        <div class="inv-item">
+          <div class="inv-icon">💎</div>
+          <div>
+            <div class="inv-val" id="inv-plan">—</div>
+            <div class="inv-label">Plano atual</div>
+            <div class="inv-desc"><a class="inv-link" onclick="goTo('planos')">Ver planos disponíveis</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ASSISTIR TRANSMISSÕES -->
+    <div class="page" id="page-assistir">
+      <div class="page-title">📺 Assistir Transmissões</div>
+      <div class="page-sub">Assista lives de outros membros e ganhe tokens. Cada sessão abre 3 abas no navegador.</div>
+
+      <div class="watch-info-box">
+        <h3>📋 Como funciona o Visualizador Click2View</h3>
+        <p>Depois de clicar em <strong>"Assistir agora"</strong>, <strong>3 abas serão abertas no seu navegador</strong> com as transmissões dos membros. O contador de tempo será iniciado aqui no site.</p>
+        <p>Cada sessão dura <strong>10 minutos</strong>. Quando o tempo acabar, você ganha os tokens e novas lives são carregadas automaticamente.</p>
+        <p class="warn">⚠️ Não feche as abas manualmente antes do tempo acabar ou não receberá os tokens!</p>
+        <table class="earn-table" style="margin-top:16px">
+          <thead><tr><th>Plano</th><th>Tokens por sessão</th><th>Limite diário</th></tr></thead>
+          <tbody>
+            <tr><td class="plan-col">Sem plano</td><td class="highlight">2 tokens</td><td>Ilimitado</td></tr>
+            <tr><td class="plan-col">⚡ Starter</td><td class="highlight">2,5 tokens</td><td>Ilimitado</td></tr>
+            <tr><td class="plan-col">🚀 Pro</td><td class="highlight">3,5 tokens</td><td>Ilimitado</td></tr>
+            <tr><td class="plan-col">👑 Elite</td><td class="highlight">6 tokens</td><td>Ilimitado</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Session UI -->
+      <div class="watch-session" id="watch-session">
+        <div class="ws-header">
+          <div class="ws-title">🔴 Sessão ativa <span class="ws-live-tag">LIVE</span></div>
+          <div class="ws-stats">
+            <div class="ws-stat"><div class="ws-stat-val" id="ws-tok">0</div><div class="ws-stat-label">tokens ganhos</div></div>
+            <div class="ws-stat"><div class="ws-stat-val" id="ws-min">0</div><div class="ws-stat-label">minutos</div></div>
+            <div class="ws-stat"><div class="ws-stat-val" id="ws-sess">0</div><div class="ws-stat-label">sessões</div></div>
+          </div>
+          <button class="btn-watch-stop" onclick="stopSession()">⏹ Parar</button>
+        </div>
+        <div class="ws-slots-grid" id="ws-slots"></div>
+      </div>
+
+      <div id="watch-start-area" style="text-align:center;padding:32px 0">
+        <div style="margin-bottom:16px;font-size:13px;color:var(--text2)" id="watch-avail-msg">Verificando lives disponíveis...</div>
+        <button class="btn-watch-start" id="btn-start-watch" onclick="startSession()">
+          ▶ Assistir agora
+        </button>
+      </div>
+    </div>
+
+    <!-- MINHAS TRANSMISSÕES -->
+    <div class="page" id="page-minhas">
+      <div class="page-title">📡 Minhas Transmissões</div>
+      <div class="page-sub">Gerencie seus canais e ative o status online para receber viewers da comunidade.</div>
+
+      <div class="my-streams-header">
+        <div class="my-streams-slot">
+          Slots utilizados: <strong id="slots-used">0</strong> / <strong id="slots-total">1</strong>
+          — <span style="font-size:12px;color:var(--text3)">Upgrade de plano para mais slots</span>
+        </div>
+      </div>
+
+      <!-- Add stream -->
+      <div class="add-stream-box" id="add-stream-box">
+        <h3>➕ Adicionar canal</h3>
+        <div class="add-form-grid">
+          <div class="fg" style="margin-bottom:0">
+            <label>Plataforma</label>
+            <select id="add-plat">
+              <option value="twitch">💜 Twitch</option>
+              <option value="youtube">🔴 YouTube</option>
+              <option value="kick">🟢 Kick</option>
+              <option value="facebook">🔵 Facebook Gaming</option>
+            </select>
+          </div>
+          <div class="fg" style="margin-bottom:0">
+            <label>Nick / Nome do canal</label>
+            <input type="text" id="add-channel" placeholder="Ex: seucanal (sem @)">
+          </div>
+        </div>
+        <button class="btn-add-stream" onclick="addStream()">Adicionar canal</button>
+      </div>
+
+      <!-- Streams table -->
+      <div class="streams-table-wrap" id="my-streams-table">
+        <div class="streams-table-head">
+          <span>Canal / Código</span>
+          <span>Views totais</span>
+          <span>Views hoje</span>
+          <span>Views mês</span>
+          <span>Status online</span>
+          <span>Excluir</span>
+        </div>
+        <div id="my-streams-rows">
+          <div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">
+            Nenhum canal cadastrado. Adicione seu canal acima.
+          </div>
+        </div>
+      </div>
+
+      <!-- ASSD -->
+      <div class="assd-box">
+        <div class="assd-info">
+          <h4>🤖 Detecção Automática de Status (ASSD)</h4>
+          <p>Quando ativado, o sistema detecta automaticamente se sua live está online ou offline.<br>
+          <span class="warn">⚠️ O ASSD será desligado se você não acessar o site por 3 dias.</span></p>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle"><input type="checkbox" id="assd-toggle" checked onchange="toggleASSD(this)"><span class="toggle-slider"></span></label>
+          <span class="toggle-label" id="assd-label">ON</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVES AO VIVO -->
+    <div class="page" id="page-lives">
+      <div class="page-title">🔴 Lives ao Vivo</div>
+      <div class="page-sub">Membros com transmissão ativa no momento.</div>
+      <div class="online-counter">
+        <span class="online-dot"></span>
+        <span id="online-count-text">Verificando lives ativas...</span>
+      </div>
+      <div class="streams-grid" id="lives-grid">
+        <div class="empty-state">
+          <div class="empty-icon">📡</div>
+          <p>Nenhuma live ativa no momento.<br>Seja o primeiro a ativar sua transmissão!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLANOS -->
+    <div class="page" id="page-planos">
+      <div class="page-title">💎 Planos</div>
+      <div class="page-sub">Renove mensalmente e ganhe muito mais tokens ao assistir lives. Quanto melhor o plano, mais rápido você cresce.</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--purple)">
+            <th style="padding:12px 16px;font-size:12px;color:#fff;text-align:left">Benefício</th>
+            <th style="padding:12px 16px;font-size:12px;color:#fff;text-align:center">Sem plano</th>
+            <th style="padding:12px 16px;font-size:12px;color:#fff;text-align:center">⚡ Starter</th>
+            <th style="padding:12px 16px;font-size:12px;color:#fff;text-align:center">🚀 Pro</th>
+            <th style="padding:12px 16px;font-size:12px;color:#fff;text-align:center">👑 Elite</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px;font-size:13px;color:var(--text2)">Tokens por sessão</td>
+              <td style="padding:12px 16px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700">2</td>
+              <td style="padding:12px 16px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--purple2)">2,5</td>
+              <td style="padding:12px 16px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--cyan)">3,5</td>
+              <td style="padding:12px 16px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--gold)">6</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:12px 16px;font-size:13px;color:var(--text2)">Slots de canal</td>
+              <td style="padding:12px 16px;text-align:center">1</td>
+              <td style="padding:12px 16px;text-align:center;color:var(--purple2)">2</td>
+              <td style="padding:12px 16px;text-align:center;color:var(--cyan)">3</td>
+              <td style="padding:12px 16px;text-align:center;color:var(--gold)">5</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;font-size:13px;color:var(--text2)">Aparece com mais frequência</td>
+              <td style="padding:12px 16px;text-align:center">—</td>
+              <td style="padding:12px 16px;text-align:center;color:var(--green)">✓</td>
+              <td style="padding:12px 16px;text-align:center;color:var(--green)">✓✓</td>
+              <td style="padding:12px 16px;text-align:center;color:var(--green)">✓✓✓</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="plans-grid" id="plans-grid"></div>
+    </div>
+
+    <!-- PERFIL -->
+    <div class="page" id="page-perfil">
+      <div class="page-title">⚙️ Configurações</div>
+      <div class="page-sub">Gerencie sua conta e preferências.</div>
+      <div class="settings-section">
+        <h3>👤 Dados da conta</h3>
+        <div class="add-form-grid">
+          <div class="fg"><label>Nickname</label><input type="text" id="cfg-nick" placeholder="Seu nickname"></div>
+          <div class="fg"><label>E-mail</label><input type="email" id="cfg-email" placeholder="seu@email.com" disabled style="opacity:.5"></div>
+        </div>
+        <button class="btn-save" onclick="saveProfile()">💾 Salvar</button>
+      </div>
+      <div class="settings-section">
+        <h3>🔐 Alterar senha</h3>
+        <div class="fg"><label>Senha atual</label><input type="password" id="cfg-pass-old" placeholder="••••••••"></div>
+        <div class="fg"><label>Nova senha</label><input type="password" id="cfg-pass-new" placeholder="Nova senha segura"></div>
+        <button class="btn-save" onclick="changePass()">🔐 Alterar senha</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toast-icon">✅</span><span id="toast-msg"></span></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════════
+const API     = 'https://viewers-backend.onrender.com/api/v1';
+const WS_URL  = 'https://viewers-backend.onrender.com';
+
+// ════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ════════════════════════════════════════════════════════════
+let STATE = {
+  token:    localStorage.getItem('cv_token'),
+  user:     JSON.parse(localStorage.getItem('cv_user') || 'null'),
+  tokens:   0,
+  minutes:  0,
+  viewers:  0,
+  myStreams: [],
+  socket:   null,
+  currentPage: 'dashboard',
+  selectedPlat: 'twitch',
+};
+
+// Session state
+let SESSION = {
+  active:   false,
+  slots:    [],       // [{nick, platform, url, secsLeft, earned}]
+  sessionTokens: 0,
+  totalSessions: 0,
+  totalMinutes:  0,
+  masterInterval: null,
+  livePool: [],       // lives disponíveis da API
+};
+
+const SESSION_SECS = 600; // 10 min
+
+// Tokens por plano por sessão
+function getSessionTokens() {
+  const plan = STATE.user?.activePlan || 'none';
+  const map = { none: 2, starter: 2.5, pro: 3.5, elite: 6 };
+  return map[plan] || 2;
+}
+
+// ════════════════════════════════════════════════════════════
+//  API HELPER
+// ════════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  };
+  if (STATE.token) opts.headers['Authorization'] = `Bearer ${STATE.token}`;
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro');
+  return data;
+}
+
+// ════════════════════════════════════════════════════════════
+//  AUTH GATE
+// ════════════════════════════════════════════════════════════
+function switchGateTab(tab) {
+  document.getElementById('tab-login-btn').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-reg-btn').classList.toggle('active', tab === 'register');
+  document.getElementById('gate-login-form').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('gate-reg-form').style.display   = tab === 'register' ? '' : 'none';
+}
+
+function selPlat(el, plat) {
+  document.querySelectorAll('.plat-opt').forEach(p => p.classList.remove('sel'));
+  el.classList.add('sel');
+  STATE.selectedPlat = plat;
+}
+
+async function doLogin() {
+  const email = document.getElementById('g-email').value.trim();
+  const pass  = document.getElementById('g-pass').value;
+  const errEl = document.getElementById('login-err');
+  const btn   = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Entrando...';
+  try {
+    const data = await api('POST', '/auth/login', { email, password: pass });
+    setSession(data.accessToken, data.user);
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+
+async function doRegister() {
+  const nick    = document.getElementById('r-nick').value.trim();
+  const email   = document.getElementById('r-email').value.trim();
+  const pass    = document.getElementById('r-pass').value;
+  const channel = document.getElementById('r-channel').value.trim();
+  const errEl   = document.getElementById('reg-err');
+  const btn     = document.getElementById('reg-btn');
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Criando conta...';
+  try {
+    const data = await api('POST', '/auth/register', {
+      nickname: nick, email, password: pass,
+      platform: STATE.selectedPlat,
+      channelUrl: channel ? `https://${STATE.selectedPlat}.tv/${channel}` : undefined,
+      liveNick: channel,
+    });
+    setSession(data.accessToken, data.user);
+    toast('🎉 Conta criada! Bem-vindo, ' + nick);
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Criar conta grátis';
+  }
+}
+
+function setSession(token, user) {
+  STATE.token = token;
+  STATE.user  = user;
+  STATE.tokens = user.tokens || 0;
+  localStorage.setItem('cv_token', token);
+  localStorage.setItem('cv_user', JSON.stringify(user));
+  document.getElementById('auth-gate').classList.remove('show');
+  document.getElementById('app').classList.add('show');
+  updateUI();
+  connectSocket();
+  loadMyStreams();
+  loadLives();
+  renderPlans();
+}
+
+function logout() {
+  api('POST', '/auth/logout').catch(()=>{});
+  STATE.token = null; STATE.user = null;
+  localStorage.removeItem('cv_token');
+  localStorage.removeItem('cv_user');
+  if (SESSION.active) stopSession();
+  if (STATE.socket) STATE.socket.disconnect();
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('auth-gate').classList.add('show');
+}
+
+// ════════════════════════════════════════════════════════════
+//  UI UPDATE
+// ════════════════════════════════════════════════════════════
+function updateUI() {
+  const u = STATE.user;
+  if (!u) return;
+  const initials = u.nickname.slice(0,2).toUpperCase();
+  // Sidebar
+  setText('sb-avatar', initials);
+  setText('sb-username', u.nickname);
+  setText('sb-tokens', Math.floor(STATE.tokens));
+  // Plan badge
+  const plan = u.activePlan || 'none';
+  const planNames = { none:'Sem plano', starter:'⚡ Starter', pro:'🚀 Pro', elite:'👑 Elite' };
+  const planClasses = { none:'plan-free', starter:'plan-starter', pro:'plan-pro', elite:'plan-elite' };
+  const planEl = document.getElementById('sb-plan');
+  planEl.textContent = planNames[plan] || 'Sem plano';
+  planEl.className = 'sb-plan ' + (planClasses[plan] || 'plan-free');
+  setText('sb-token-rate', '+' + getSessionTokens() + ' por sessão');
+  // Dashboard
+  setText('sb-avatar', initials);
+  setText('dash-avatar', initials);
+  setText('dash-welcome-msg', 'Bem-vindo, ' + u.nickname + '!');
+  setText('inv-tokens', Math.floor(STATE.tokens));
+  setText('inv-minutes', STATE.minutes || 0);
+  setText('inv-viewers', STATE.viewers || 0);
+  setText('inv-plan', planNames[plan]);
+  // Config
+  const cfgNick = document.getElementById('cfg-nick');
+  const cfgEmail = document.getElementById('cfg-email');
+  if (cfgNick) cfgNick.value = u.nickname;
+  if (cfgEmail) cfgEmail.value = u.email;
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════════
+function goTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page)?.classList.add('active');
+  document.getElementById('nav-' + page)?.classList.add('active');
+  STATE.currentPage = page;
+  if (page === 'lives') loadLives();
+  if (page === 'assistir') checkAvailableLives();
+}
+
+// ════════════════════════════════════════════════════════════
+//  WEBSOCKET
+// ════════════════════════════════════════════════════════════
+function connectSocket() {
+  if (!STATE.token) return;
+  const socket = io(WS_URL, { auth: { token: STATE.token }, transports: ['websocket','polling'] });
+  STATE.socket = socket;
+  socket.on('connect', () => console.log('WS connected'));
+  socket.on('online:count', (count) => {
+    setText('online-count-text', count + ' live(s) ativa(s) agora');
+    setText('lives-count', count);
+  });
+  socket.on('ranking:update', () => loadLives());
+  socket.on('payment:completed', (data) => {
+    STATE.tokens = data.balance;
+    updateUI();
+    toast('🎉 Pagamento confirmado! +' + data.tokens + ' tokens');
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  LIVES — carrega da API
+// ════════════════════════════════════════════════════════════
+async function loadLives() {
+  const grid = document.getElementById('lives-grid');
+  try {
+    const data = await api('GET', '/streamers?limit=50');
+    const lives = (data.data || []).filter(s => s.isLive);
+    setText('lives-count', lives.length);
+
+    if (lives.length === 0) {
+      grid.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">📡</div>
+        <p>Nenhuma live ativa no momento.<br>Ative sua transmissão em "Minhas Transmissões"!</p>
+      </div>`;
+      setText('online-count-text', '0 live(s) ativa(s) agora');
+      return;
+    }
+
+    setText('online-count-text', lives.length + ' live(s) ativa(s) agora');
+    SESSION.livePool = lives.map(s => ({
+      id:       s._id,
+      nick:     s.user?.liveNick || s.user?.nickname || 'canal',
+      nickname: s.user?.nickname || 'Streamer',
+      platform: s.user?.platform || 'twitch',
+      title:    s.streamTitle || 'Ao vivo',
+      game:     s.game || '',
+    }));
+
+    const platEmoji = { twitch:'💜', youtube:'🔴', kick:'🟢', facebook:'🔵' };
+    const platUrl   = { twitch:'https://twitch.tv/', youtube:'https://youtube.com/@', kick:'https://kick.com/', facebook:'https://facebook.com/' };
+    const tk = getSessionTokens();
+    grid.innerHTML = lives.map((s, i) => {
+      const plat = s.user?.platform || 'twitch';
+      const nick = s.user?.liveNick || s.user?.nickname || 'canal';
+      return `<div class="stream-card" onclick="openStreamTab('${platUrl[plat]}${nick}')">
+        <div class="sc-thumb">
+          🎮
+          <span class="sc-live-tag">LIVE</span>
+          <span class="sc-plat">${platEmoji[plat]||'📺'}</span>
+        </div>
+        <div class="sc-body">
+          <div class="sc-name">${s.user?.nickname || 'Streamer'}</div>
+          <div class="sc-channel">${nick}</div>
+        </div>
+        <div class="sc-foot">
+          <span class="sc-earn-badge">+${tk} tok/sessão</span>
+          <button class="btn-watch" onclick="event.stopPropagation();openStreamTab('${platUrl[plat]}${nick}')">Assistir</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><p>Nenhuma live ativa no momento.</p></div>`;
+    setText('online-count-text', '0 live(s) ativa(s) agora');
+    SESSION.livePool = [];
+  }
+}
+
+function openStreamTab(url) {
+  window.open(url, '_blank');
+}
+
+// ════════════════════════════════════════════════════════════
+//  ASSISTIR — SESSÃO COM 3 ABAS REAIS
+// ════════════════════════════════════════════════════════════
+async function checkAvailableLives() {
+  await loadLives();
+  const msgEl = document.getElementById('watch-avail-msg');
+  const btnEl = document.getElementById('btn-start-watch');
+  if (SESSION.livePool.length === 0) {
+    msgEl.innerHTML = '<span style="color:var(--red)">⚠️ Nenhuma live ativa no momento. Volte mais tarde ou convide outros streamers!</span>';
+    btnEl.disabled = true;
+    btnEl.style.opacity = '.5';
+  } else {
+    msgEl.textContent = SESSION.livePool.length + ' live(s) disponível(is) para assistir';
+    btnEl.disabled = false;
+    btnEl.style.opacity = '1';
+  }
+}
+
+async function startSession() {
+  if (SESSION.active) return;
+  if (SESSION.livePool.length === 0) {
+    await loadLives();
+    if (SESSION.livePool.length === 0) {
+      toast('Nenhuma live disponível agora. Tente mais tarde!', true);
+      return;
+    }
+  }
+
+  // Pega até 3 lives diferentes
+  const pool    = [...SESSION.livePool];
+  const picked  = [];
+  const platUrl = { twitch:'https://twitch.tv/', youtube:'https://youtube.com/@', kick:'https://kick.com/', facebook:'https://facebook.com/' };
+
+  for (let i = 0; i < Math.min(3, pool.length); i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(idx, 1)[0]);
+  }
+
+  // Abre 3 abas reais no navegador
+  picked.forEach(s => {
+    const url = (platUrl[s.platform] || 'https://twitch.tv/') + s.nick;
+    window.open(url, '_blank');
+  });
+
+  SESSION.active        = true;
+  SESSION.slots         = picked.map(s => ({ ...s, secsLeft: SESSION_SECS, earned: false }));
+  SESSION.sessionTokens = 0;
+
+  document.getElementById('watch-session').classList.add('active');
+  document.getElementById('watch-start-area').style.display = 'none';
+  renderSlots();
+
+  SESSION.masterInterval = setInterval(sessionTick, 1000);
+  toast('▶ 3 abas abertas! Timer iniciado. Mantenha as abas abertas.');
+}
+
+function sessionTick() {
+  let allDone = true;
+  SESSION.slots.forEach((slot, i) => {
+    if (slot.rotating) return;
+    slot.secsLeft--;
+    if (slot.secsLeft <= 0) {
+      allDone = false;
+      rotateSlot(i);
+    } else {
+      allDone = false;
+      updateSlotTimer(i);
+    }
+  });
+  updateSessionHeader();
+}
+
+async function rotateSlot(i) {
+  const slot = SESSION.slots[i];
+  if (slot.rotating) return;
+  slot.rotating = true;
+  renderSlotRotating(i);
+
+  // Credita tokens
+  const earned = getSessionTokens();
+  SESSION.sessionTokens  += earned;
+  SESSION.totalSessions++;
+  SESSION.totalMinutes   += 10;
+  STATE.tokens            += earned;
+  STATE.minutes            = (STATE.minutes || 0) + 10;
+
+  setText('ws-tok', SESSION.sessionTokens.toFixed(1));
+  setText('ws-min', SESSION.totalMinutes);
+  setText('ws-sess', SESSION.totalSessions);
+  setText('sb-tokens', Math.floor(STATE.tokens));
+  setText('inv-tokens', Math.floor(STATE.tokens));
+  setText('inv-minutes', STATE.minutes);
+
+  // Mostra token flutuante
+  showTokenFloat('+' + earned);
+
+  // Chama API
+  api('POST', '/tokens/earn').then(d => { if (d?.newBalance) STATE.tokens = d.newBalance; }).catch(()=>{});
+
+  // Espera 3s e pega nova live
+  await sleep(3000);
+  await loadLives();
+
+  const pool = SESSION.livePool.filter(s => !SESSION.slots.some((sl, idx) => idx !== i && sl.nick === s.nick));
+  if (pool.length === 0) {
+    // Sem novas lives — termina slot
+    slot.rotating = false;
+    slot.secsLeft = 0;
+    renderSlotEmpty(i);
+    return;
+  }
+
+  const next = pool[Math.floor(Math.random() * pool.length)];
+  const platUrl = { twitch:'https://twitch.tv/', youtube:'https://youtube.com/@', kick:'https://kick.com/', facebook:'https://facebook.com/' };
+  // Abre nova aba
+  window.open((platUrl[next.platform] || 'https://twitch.tv/') + next.nick, '_blank');
+
+  SESSION.slots[i] = { ...next, secsLeft: SESSION_SECS, earned: false, rotating: false };
+  renderSlot(i);
+  updateUI();
+}
+
+function stopSession() {
+  SESSION.active = false;
+  clearInterval(SESSION.masterInterval);
+  document.getElementById('watch-session').classList.remove('active');
+  document.getElementById('watch-start-area').style.display = '';
+  if (SESSION.sessionTokens > 0) {
+    toast('✅ Sessão encerrada! +' + SESSION.sessionTokens.toFixed(1) + ' tokens ganhos!');
+  }
+  checkAvailableLives();
+  updateUI();
+}
+
+function renderSlots() {
+  const container = document.getElementById('ws-slots');
+  container.innerHTML = '';
+  SESSION.slots.forEach((_, i) => {
+    const div = document.createElement('div');
+    div.className = 'ws-slot';
+    div.id = 'ws-slot-' + i;
+    container.appendChild(div);
+    renderSlot(i);
+  });
+}
+
+function renderSlot(i) {
+  const s   = SESSION.slots[i];
+  const el  = document.getElementById('ws-slot-' + i);
+  if (!el) return;
+  const platEmoji = { twitch:'💜', youtube:'🔴', kick:'🟢', facebook:'🔵' };
+  el.innerHTML = `
+    <div class="ws-slot-head">
+      <div>
+        <div class="ws-slot-name">${s.nickname}</div>
+        <div style="font-size:11px;color:var(--text3)">${s.nick}</div>
+      </div>
+      <div class="ws-slot-plat">${platEmoji[s.platform]||'📺'}</div>
+    </div>
+    <div class="ws-slot-timer" id="slot-timer-${i}">${fmtTime(s.secsLeft)}</div>
+    <div class="ws-slot-prog"><div class="ws-slot-prog-fill" id="slot-prog-${i}" style="width:${pct(s.secsLeft)}%"></div></div>
+    <div class="ws-slot-status">⏱ ${fmtTime(s.secsLeft)} restantes</div>
+    <div class="ws-slot-earn" id="slot-earn-${i}"></div>`;
+}
+
+function renderSlotRotating(i) {
+  const el = document.getElementById('ws-slot-' + i);
+  if (!el) return;
+  el.innerHTML = `<div class="ws-slot-rotating"><div class="spinner"></div><div>Carregando próxima live...</div></div>`;
+}
+
+function renderSlotEmpty(i) {
+  const el = document.getElementById('ws-slot-' + i);
+  if (!el) return;
+  el.innerHTML = `<div class="ws-slot-rotating"><div style="font-size:32px;opacity:.4">📡</div><div>Sem lives disponíveis</div></div>`;
+}
+
+function updateSlotTimer(i) {
+  const s = SESSION.slots[i];
+  const timerEl = document.getElementById('slot-timer-' + i);
+  const progEl  = document.getElementById('slot-prog-' + i);
+  if (timerEl) { timerEl.textContent = fmtTime(s.secsLeft); timerEl.className = 'ws-slot-timer' + (s.secsLeft <= 60 ? ' urgent' : ''); }
+  if (progEl)  progEl.style.width = pct(s.secsLeft) + '%';
+}
+
+function updateSessionHeader() {
+  setText('ws-tok',  SESSION.sessionTokens.toFixed(1));
+  setText('ws-min',  SESSION.totalMinutes);
+  setText('ws-sess', SESSION.totalSessions);
+}
+
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function pct(secs) { return Math.round(((SESSION_SECS - secs) / SESSION_SECS) * 100); }
+
+function showTokenFloat(text) {
+  const el = document.createElement('div');
+  el.className = 'token-float';
+  el.textContent = text;
+  el.style.left = (window.innerWidth / 2 - 40) + 'px';
+  el.style.top  = (window.innerHeight / 2) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ════════════════════════════════════════════════════════════
+//  MINHAS TRANSMISSÕES
+// ════════════════════════════════════════════════════════════
+async function loadMyStreams() {
+  try {
+    const data = await api('GET', '/streamers/me');
+    STATE.myStreams = data.data ? [data.data] : [];
+  } catch { STATE.myStreams = []; }
+  renderMyStreams();
+}
+
+function renderMyStreams() {
+  const u = STATE.user;
+  const planSlots = { none:1, starter:2, pro:3, elite:5 };
+  const maxSlots  = planSlots[u?.activePlan || 'none'] || 1;
+  setText('slots-used', STATE.myStreams.length);
+  setText('slots-total', maxSlots);
+
+  const addBox = document.getElementById('add-stream-box');
+  if (addBox) addBox.style.display = STATE.myStreams.length >= maxSlots ? 'none' : '';
+
+  const platEmoji = { twitch:'💜', youtube:'🔴', kick:'🟢', facebook:'🔵' };
+  const platNames = { twitch:'Twitch', youtube:'YouTube', kick:'Kick', facebook:'Facebook' };
+
+  const rowsEl = document.getElementById('my-streams-rows');
+  if (!rowsEl) return;
+
+  if (STATE.myStreams.length === 0) {
+    rowsEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">Nenhum canal cadastrado. Adicione seu canal acima.</div>`;
+    return;
+  }
+
+  rowsEl.innerHTML = STATE.myStreams.map((s, i) => {
+    const plat  = s.user?.platform || u?.platform || 'twitch';
+    const nick  = s.user?.liveNick || u?.liveNick || '—';
+    const isLive = s.isLive;
+    return `<div class="streams-table-row">
+      <div class="stream-channel-info">
+        <div class="stream-plat-logo">${platEmoji[plat]||'📺'}</div>
+        <div>
+          <div class="stream-channel-name">${nick}</div>
+          <div style="font-size:11px;color:var(--text3)">${platNames[plat]||plat}</div>
+          <div class="stream-edit-link" onclick="editChannel(${i})">[ EDITAR CANAL ]</div>
+        </div>
+      </div>
+      <div class="stream-stat">${s.totalViewers || 0}</div>
+      <div class="stream-stat">${s.todayViewers || 0}</div>
+      <div class="stream-stat">${s.monthViewers || 0}</div>
+      <div class="stream-status-cell">
+        <div class="${isLive ? 'status-online' : 'status-offline'}">
+          ${isLive ? '🟢 ONLINE' : '🔴 OFFLINE'}
+        </div>
+        <div class="toggle-wrap" style="margin-top:6px">
+          <label class="toggle">
+            <input type="checkbox" ${isLive?'checked':''} onchange="toggleStream(${i}, this)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">${isLive?'ON':'OFF'}</span>
+        </div>
+        <div class="status-note">Atualizado automaticamente</div>
+      </div>
+      <button class="btn-delete" onclick="deleteStream(${i})" title="Remover">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+async function addStream() {
+  const plat = document.getElementById('add-plat').value;
+  const nick = document.getElementById('add-channel').value.trim();
+  if (!nick) { toast('Informe o nick do canal!', true); return; }
+
+  try {
+    await api('PATCH', '/streamers/me/go-live', { streamTitle: '', game: '', liveNick: nick });
+    STATE.user.liveNick = nick;
+    localStorage.setItem('cv_user', JSON.stringify(STATE.user));
+    await loadMyStreams();
+    document.getElementById('add-channel').value = '';
+    toast('✅ Canal adicionado!');
+  } catch(e) {
+    // Adiciona localmente se API falhar
+    STATE.myStreams.push({ user: { platform: plat, liveNick: nick, nickname: STATE.user?.nickname }, isLive: false, totalViewers:0, todayViewers:0, monthViewers:0 });
+    renderMyStreams();
+    toast('✅ Canal adicionado!');
+  }
+}
+
+async function toggleStream(i, el) {
+  const isOn = el.checked;
+  const label = el.closest('.toggle-wrap')?.querySelector('.toggle-label');
+  if (label) label.textContent = isOn ? 'ON' : 'OFF';
+  try {
+    if (isOn) {
+      const nick = STATE.myStreams[i]?.user?.liveNick || STATE.user?.liveNick || '';
+      await api('PATCH', '/streamers/me/go-live', { streamTitle: '', game: '', liveNick: nick });
+    } else {
+      await api('PATCH', '/streamers/me/go-offline');
+    }
+    await loadMyStreams();
+    toast(isOn ? '🟢 Live ativada!' : '🔴 Live desativada!');
+  } catch {
+    STATE.myStreams[i].isLive = isOn;
+    renderMyStreams();
+    toast(isOn ? '🟢 Live ativada!' : '🔴 Live desativada!');
+  }
+}
+
+function editChannel(i) {
+  const s    = STATE.myStreams[i];
+  const plat = s.user?.platform || STATE.user?.platform || 'twitch';
+  const nick = s.user?.liveNick || '';
+  const platNames = { twitch:'Twitch', youtube:'YouTube', kick:'Kick', facebook:'Facebook' };
+
+  const newNick = prompt(`Editar nick do canal (${platNames[plat] || plat}):`, nick);
+  if (newNick === null) return;
+  if (!newNick.trim()) { toast('Nick não pode ser vazio!', true); return; }
+
+  STATE.myStreams[i].user = { ...STATE.myStreams[i].user, liveNick: newNick.trim() };
+  STATE.user.liveNick = newNick.trim();
+  localStorage.setItem('cv_user', JSON.stringify(STATE.user));
+  api('PATCH', '/users/me', { channelUrl: `https://${plat}.tv/${newNick.trim()}` }).catch(()=>{});
+  renderMyStreams();
+  toast('✅ Canal atualizado!');
+}
+
+async function deleteStream(i) {
+  if (!confirm('Remover este canal?')) return;
+  try {
+    await api('PATCH', '/streamers/me/go-offline');
+  } catch {}
+  STATE.myStreams.splice(i, 1);
+  renderMyStreams();
+  toast('Canal removido.');
+}
+
+function toggleASSD(el) {
+  const label = document.getElementById('assd-label');
+  if (label) label.textContent = el.checked ? 'ON' : 'OFF';
+  toast(el.checked ? '🤖 ASSD ativado!' : '🤖 ASSD desativado!');
+}
+
+// ════════════════════════════════════════════════════════════
+//  PLANOS
+// ════════════════════════════════════════════════════════════
+function renderPlans() {
+  const plans = [
+    { id:'starter', name:'⚡ Starter', price:'R$ 9,90',  tk:'2,5', slots:2, url:'https://mpago.la/2ijhdqV', featured:false,
+      features:['2,5 tokens por sessão','2 slots de canal','Aparece com mais frequência','Renovação mensal necessária'] },
+    { id:'pro',     name:'🚀 Pro',     price:'R$ 24,90', tk:'3,5', slots:3, url:'https://mpago.la/25aBBfq', featured:true,
+      features:['3,5 tokens por sessão','3 slots de canal','Alta frequência no sistema','Prioridade no ranking','Renovação mensal necessária'] },
+    { id:'elite',   name:'👑 Elite',   price:'R$ 69,90', tk:'6',   slots:5, url:'https://mpago.la/2kMbtut', featured:false,
+      features:['6 tokens por sessão','5 slots de canal','Máxima prioridade','Badge exclusiva','Renovação mensal necessária'] },
+  ];
+  const grid = document.getElementById('plans-grid');
+  if (!grid) return;
+  grid.innerHTML = plans.map(p => `
+    <div class="plan-card ${p.featured?'featured':''}">
+      ${p.featured?'<div class="plan-featured-badge">⭐ Mais Popular</div>':''}
+      <div class="plan-name">${p.name}</div>
+      <div class="plan-price">${p.price}</div>
+      <div class="plan-cycle">renovação mensal necessária</div>
+      <div class="plan-earn-box">
+        <div class="plan-earn-label">Tokens por sessão</div>
+        <div class="plan-earn-val">+${p.tk}</div>
+      </div>
+      <ul class="plan-features">
+        ${p.features.map(f=>`<li><span class="plan-check">✓</span>${f}</li>`).join('')}
+      </ul>
+      <button class="plan-btn" onclick="window.open('${p.url}','_blank')">Escolher ${p.name}</button>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  PERFIL / CONFIGURAÇÕES
+// ════════════════════════════════════════════════════════════
+async function saveProfile() {
+  const nick = document.getElementById('cfg-nick')?.value.trim();
+  if (!nick) { toast('Nickname não pode ser vazio!', true); return; }
+  try {
+    await api('PATCH', '/users/me', { nickname: nick });
+    STATE.user.nickname = nick;
+    localStorage.setItem('cv_user', JSON.stringify(STATE.user));
+    updateUI();
+    toast('✅ Perfil salvo!');
+  } catch(e) { toast(e.message, true); }
+}
+
+async function changePass() {
+  const oldP = document.getElementById('cfg-pass-old')?.value;
+  const newP = document.getElementById('cfg-pass-new')?.value;
+  if (!oldP || !newP) { toast('Preencha as senhas!', true); return; }
+  try {
+    await api('PATCH', '/users/me/password', { currentPassword: oldP, newPassword: newP });
+    toast('✅ Senha alterada!');
+    document.getElementById('cfg-pass-old').value = '';
+    document.getElementById('cfg-pass-new').value = '';
+  } catch(e) { toast(e.message, true); }
+}
+
+// ════════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg, isErr = false) {
+  const el   = document.getElementById('toast');
+  const icon = document.getElementById('toast-icon');
+  const msgEl = document.getElementById('toast-msg');
+  if (!el) return;
+  icon.textContent = isErr ? '⚠️' : '✅';
+  msgEl.textContent = msg;
+  el.classList.toggle('err', isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+(function init() {
+  if (STATE.token && STATE.user) {
+    document.getElementById('auth-gate').classList.remove('show');
+    document.getElementById('app').classList.add('show');
+    updateUI();
+    connectSocket();
+    loadMyStreams();
+    loadLives();
+    renderPlans();
+  }
+
+  // Enter key no login
+  document.getElementById('g-pass')?.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  document.getElementById('g-email')?.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+})();
+</script>
+</body>
+</html>
