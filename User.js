@@ -59,9 +59,7 @@ const userSchema = new mongoose.Schema({
   }},
 });
 
-userSchema.index({ email:1 },    { unique:true });
-userSchema.index({ nickname:1 }, { unique:true });
-userSchema.index({ tokens:-1 });
+userSchema.index({ tokens: -1 });
 
 userSchema.virtual('isLocked').get(function() {
   return !!(this.lockUntil && this.lockUntil > Date.now());
