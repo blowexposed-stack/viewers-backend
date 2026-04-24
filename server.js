@@ -23,7 +23,14 @@ async function startServer() {
   }
 }
 
-process.on('uncaughtException',  (err) => { console.error(err); process.exit(1); });
-process.on('unhandledRejection', (r)   => { console.error(r);   process.exit(1); });
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection:', reason);
+  process.exit(1);
+});
 
 startServer();
