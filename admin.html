@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Comunidade Viewers</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0d;--bg2:#141414;--bg3:#1a1a1a;--card:#1e1e1e;--card2:#252525;--border:#2e2e2e;--border2:#3a3a3a;--text:#f2f2f2;--text2:#999;--text3:#555;--purple:#7c3aed;--purple2:#9d5cf7;--green:#22c55e;--red:#ef4444;--gold:#f59e0b;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+
+/* ── LOGIN ── */
+#login-screen{flex:1;display:flex;align-items:center;justify-content:center;padding:1rem;}
+.login-box{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo-icon{width:56px;height:56px;background:var(--purple);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:10px;}
+.login-logo-title{font-size:18px;font-weight:800;letter-spacing:-.3px;}
+.login-logo-sub{font-size:12px;color:var(--text3);margin-top:3px;}
+.fg{margin-bottom:14px;}
+.fg label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.fg input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;font-size:14px;font-family:'Inter',sans-serif;color:var(--text);outline:none;transition:border-color .15s;}
+.fg input:focus{border-color:var(--purple);}
+.fg input::placeholder{color:var(--text3);}
+.login-btn{width:100%;padding:13px;background:var(--purple);border:none;border-radius:9px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;}
+.login-btn:hover{background:var(--purple2);}
+.login-err{font-size:12px;color:var(--red);margin-bottom:10px;display:none;padding:8px 12px;background:rgba(239,68,68,.08);border-radius:6px;text-align:center;}
+
+/* ── ADMIN PANEL ── */
+#admin-panel{display:none;flex:1;flex-direction:column;}
+.admin-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.admin-header-left{display:flex;align-items:center;gap:12px;}
+.admin-title{font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.admin-badge{background:var(--purple);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;letter-spacing:.5px;}
+.admin-main{flex:1;padding:28px;overflow-y:auto;max-width:1200px;width:100%;margin:0 auto;}
+.btn-logout{background:transparent;border:1px solid var(--border2);color:var(--text3);padding:6px 14px;border-radius:7px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-logout:hover{border-color:var(--red);color:var(--red);}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:28px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;line-height:1;}
+.stat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-top:6px;}
+
+/* ── SECTIONS ── */
+.section{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;}
+.section-head{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 20px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.section-body{padding:20px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:140px;}
+.field label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+.field input,.field select{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 13px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);outline:none;transition:border-color .15s;}
+.field input:focus,.field select:focus{border-color:var(--purple);}
+.field select option{background:var(--bg3);}
+.btn{padding:10px 20px;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-purple{background:var(--purple);color:#fff;}
+.btn-purple:hover{background:var(--purple2);}
+.btn-gold{background:var(--gold);color:#000;}
+.btn-gold:hover{opacity:.85;}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.btn-red{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);}
+.btn-red:hover{background:rgba(239,68,68,.2);}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+.tbl td{padding:10px 12px;border-bottom:1px solid rgba(46,46,46,.4);}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,.02);}
+.tbl-actions{display:flex;gap:5px;align-items:center;}
+.plan-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;}
+.pt-none{background:rgba(153,153,153,.15);color:#888;}
+.pt-starter{background:rgba(124,58,237,.2);color:#9d5cf7;}
+.pt-pro{background:rgba(6,182,212,.15);color:#06b6d4;}
+.pt-elite{background:rgba(245,158,11,.15);color:#f59e0b;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:20px;right:20px;z-index:999;background:var(--card2);border:1px solid var(--green);border-radius:10px;padding:12px 18px;font-size:13px;color:var(--text);display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(34,197,94,.15);max-width:320px;}
+.toast.show{display:flex;}
+.toast.err{border-color:var(--red);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon">🛡️</div>
+      <div class="login-logo-title">Painel Admin</div>
+      <div class="login-logo-sub">Comunidade Viewers — Acesso restrito</div>
+    </div>
+    <div class="login-err" id="login-err"></div>
+    <div class="fg">
+      <label>Senha de administrador</label>
+      <input type="password" id="admin-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    </div>
+    <button class="login-btn" onclick="doAdminLogin()">Entrar no painel</button>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="admin-panel">
+  <div class="admin-header">
+    <div class="admin-header-left">
+      <div class="admin-title">🛡️ Painel Admin <span class="admin-badge">RESTRITO</span></div>
+    </div>
+    <button class="btn-logout" onclick="adminLogout()">🚪 Sair</button>
+  </div>
+
+  <div class="admin-main">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" id="s-users" style="color:var(--purple2)">—</div><div class="stat-label">Usuários</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-live" style="color:var(--green)">—</div><div class="stat-label">Lives agora</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-pay" style="color:var(--gold)">—</div><div class="stat-label">Pagamentos</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-tokens" style="color:var(--purple2)">—</div><div class="stat-label">Tokens circulando</div></div>
+    </div>
+
+    <!-- Modo Evento -->
+    <div class="section">
+      <div class="section-head">🎉 Modo Evento — Adicionar tokens a TODOS os usuários</div>
+      <div class="section-body">
+        <div class="row">
+          <div class="field" style="min-width:120px;max-width:160px">
+            <label>Tokens para todos</label>
+            <input type="number" id="ev-amount" placeholder="Ex: 100" min="1">
+          </div>
+          <div class="field">
+            <label>Motivo do evento</label>
+            <input type="text" id="ev-reason" placeholder="Ex: Evento de lançamento, Natal, etc">
+          </div>
+          <button class="btn btn-gold" onclick="sendEvent()">🎉 Enviar para todos</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add tokens to user -->
+    <div class="section">
+      <div class="section-head">💰 Adicionar tokens a usuário específico</div>
+      <div class="section-body">
+        <div class="row">
+          <div class="field">
+            <label>ID ou nickname do usuário</label>
+            <input type="text" id="u-id" placeholder="ID MongoDB ou nickname">
+          </div>
+          <div class="field" style="min-width:120px;max-width:160px">
+            <label>Quantidade</label>
+            <input type="number" id="u-amount" placeholder="Ex: 50" min="1">
+          </div>
+          <div class="field" style="min-width:120px;max-width:160px">
+            <label>Motivo</label>
+            <input type="text" id="u-reason" placeholder="Motivo">
+          </div>
+          <button class="btn btn-purple" onclick="addTokens()">💰 Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Usuarios -->
+    <div class="section">
+      <div class="section-head">
+        👥 Usuários cadastrados
+        <input type="text" id="search-input" placeholder="Buscar por nickname ou e-mail..."
+          oninput="searchUsers(this.value)"
+          style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--text);outline:none;width:240px;font-family:'Inter',sans-serif;">
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nickname</th>
+              <th>E-mail</th>
+              <th>Plataforma</th>
+              <th style="text-align:center">Tokens</th>
+              <th style="text-align:center">Plano</th>
+              <th>Cadastro</th>
+              <th style="text-align:center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Carregando usuários...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="users-pagination" style="padding:12px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--border);font-size:12px;color:var(--text3)"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toast-icon">✅</span><span id="toast-msg"></span></div>
+
+<script>
+const API         = 'https://viewers-backend.onrender.com/api/v1';
+const ADMIN_PASS  = 'viewers@admin2025!'; // Senha local — mude aqui
+let   adminToken  = localStorage.getItem('cv_admin_token') || null;
+
+// ── Autenticação local por senha ──────────────────────────────────────────────
+function doAdminLogin() {
+  const pass = document.getElementById('admin-pass').value;
+  const errEl = document.getElementById('login-err');
+  if (pass !== ADMIN_PASS) {
+    errEl.textContent = 'Senha incorreta.';
+    errEl.style.display = 'block';
+    document.getElementById('admin-pass').value = '';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  // Usa o token JWT de admin guardado ou pede login no backend
+  const savedToken = localStorage.getItem('cv_token');
+  const savedUser  = JSON.parse(localStorage.getItem('cv_user') || 'null');
+  if (savedToken && savedUser?.role === 'admin') {
+    adminToken = savedToken;
+    showPanel();
+  } else {
+    // Mostra campo extra para o JWT de admin
+    showAdminJWTField();
+  }
+}
+
+function showAdminJWTField() {
+  const box = document.querySelector('.login-box');
+  box.innerHTML += `
+    <div class="fg" style="margin-top:16px">
+      <label>Token JWT de admin (do backend)</label>
+      <input type="text" id="admin-jwt" placeholder="Bearer token do seu usuário admin">
+    </div>
+    <button class="login-btn" style="margin-top:8px" onclick="loginWithJWT()">Confirmar</button>`;
+}
+
+function loginWithJWT() {
+  const jwt = document.getElementById('admin-jwt')?.value.trim();
+  if (!jwt) { toast('Cole o JWT de admin!', true); return; }
+  adminToken = jwt;
+  localStorage.setItem('cv_admin_token', jwt);
+  showPanel();
+}
+
+function showPanel() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-panel').style.display  = 'flex';
+  loadStats();
+  loadUsers();
+}
+
+function adminLogout() {
+  adminToken = null;
+  localStorage.removeItem('cv_admin_token');
+  location.reload();
+}
+
+// ── API ────────────────────────────────────────────────────────────────────────
+async function req(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + adminToken },
+    credentials: 'include',
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erro');
+  return data;
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const data = await req('GET', '/admin/stats');
+    document.getElementById('s-users').textContent    = data.data.totalUsers;
+    document.getElementById('s-live').textContent     = data.data.onlineStreams;
+    document.getElementById('s-pay').textContent      = data.data.totalPayments;
+    // Calcula total de tokens
+    const tkData = await req('GET', '/admin/users?limit=1000');
+    const totalTk = (tkData.data || []).reduce((acc, u) => acc + (u.tokens||0), 0);
+    document.getElementById('s-tokens').textContent = totalTk.toLocaleString('pt-BR');
+  } catch(e) { toast('Erro ao carregar stats: ' + e.message, true); }
+}
+
+// ── Usuários ────────────────────────────────────────────────────────────────────
+let currentPage = 1;
+let currentSearch = '';
+
+async function loadUsers(page = 1, search = '') {
+  currentPage = page;
+  currentSearch = search;
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Carregando...</td></tr>';
+
+  try {
+    const data = await req('GET', '/admin/users?page=' + page + '&limit=20' + (search ? '&search=' + encodeURIComponent(search) : ''));
+    const planColors = { none:'pt-none', starter:'pt-starter', pro:'pt-pro', elite:'pt-elite' };
+    const planNames  = { none:'Free', starter:'Starter', pro:'Pro', elite:'Elite' };
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum usuário encontrado.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map((u, i) => `
+      <tr>
+        <td style="color:var(--text3)">${((page-1)*20) + i + 1}</td>
+        <td style="font-weight:600">${u.nickname}</td>
+        <td style="color:var(--text2);font-size:11px">${u.email}</td>
+        <td style="color:var(--text2)">${u.platform}</td>
+        <td style="text-align:center;font-family:'JetBrains Mono',monospace;color:var(--gold);font-weight:700">${u.tokens}</td>
+        <td style="text-align:center"><span class="plan-tag ${planColors[u.activePlan||'none']}">${planNames[u.activePlan||'none']}</span></td>
+        <td style="color:var(--text3);font-size:11px">${new Date(u.createdAt).toLocaleDateString('pt-BR')}</td>
+        <td>
+          <div class="tbl-actions">
+            <button class="btn btn-sm btn-purple" onclick="quickTokens('${u._id}','${u.nickname}')">+tokens</button>
+            <select onchange="changePlan('${u._id}',this.value,this)" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 6px;font-size:11px;color:var(--text);font-family:'Inter',sans-serif;outline:none">
+              <option value="">plano</option>
+              <option value="none">Free</option>
+              <option value="starter">Starter</option>
+              <option value="pro">Pro</option>
+              <option value="elite">Elite</option>
+            </select>
+            <button class="btn btn-sm btn-red" onclick="suspendUser('${u._id}','${u.nickname}')">ban</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    // Paginação
+    const pages = data.pagination?.pages || 1;
+    const pagEl = document.getElementById('users-pagination');
+    pagEl.innerHTML = `
+      Página ${page} de ${pages} — ${data.pagination?.total} usuários
+      ${page > 1 ? '<button class="btn btn-sm btn-purple" onclick="loadUsers(' + (page-1) + ',currentSearch)" style="margin-left:8px">← Anterior</button>' : ''}
+      ${page < pages ? '<button class="btn btn-sm btn-purple" onclick="loadUsers(' + (page+1) + ',currentSearch)" style="margin-left:4px">Próxima →</button>' : ''}`;
+  } catch(e) { toast('Erro: ' + e.message, true); }
+}
+
+let searchTimer;
+function searchUsers(val) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadUsers(1, val), 400);
+}
+
+// ── Ações ───────────────────────────────────────────────────────────────────────
+async function sendEvent() {
+  const amount = parseInt(document.getElementById('ev-amount').value);
+  const reason = document.getElementById('ev-reason').value.trim() || 'Evento admin';
+  if (!amount || amount <= 0) { toast('Informe uma quantidade válida!', true); return; }
+  if (!confirm('Enviar ' + amount + ' tokens para TODOS os usuários? Motivo: ' + reason)) return;
+  try {
+    const data = await req('POST', '/admin/tokens/event', { amount, reason });
+    toast('🎉 ' + data.message);
+    document.getElementById('ev-amount').value = '';
+    document.getElementById('ev-reason').value = '';
+    loadStats();
+    loadUsers(currentPage, currentSearch);
+  } catch(e) { toast('Erro: ' + e.message, true); }
+}
+
+async function addTokens() {
+  const userId = document.getElementById('u-id').value.trim();
+  const amount = parseInt(document.getElementById('u-amount').value);
+  const reason = document.getElementById('u-reason').value.trim() || 'Admin manual';
+  if (!userId) { toast('Informe o ID ou nickname!', true); return; }
+  if (!amount || amount <= 0) { toast('Informe uma quantidade!', true); return; }
+  try {
+    const data = await req('POST', '/admin/tokens/add', { userId, amount, reason });
+    toast('✅ ' + data.message);
+    document.getElementById('u-id').value = '';
+    document.getElementById('u-amount').value = '';
+    document.getElementById('u-reason').value = '';
+    loadUsers(currentPage, currentSearch);
+    loadStats();
+  } catch(e) { toast('Erro: ' + e.message, true); }
+}
+
+async function quickTokens(userId, nickname) {
+  const amount = parseInt(prompt('Quantos tokens adicionar para ' + nickname + '?'));
+  if (!amount || isNaN(amount) || amount <= 0) return;
+  try {
+    const data = await req('POST', '/admin/tokens/add', { userId, amount, reason: 'Admin rápido' });
+    toast('✅ ' + data.message);
+    loadUsers(currentPage, currentSearch);
+    loadStats();
+  } catch(e) { toast('Erro: ' + e.message, true); }
+}
+
+async function changePlan(userId, plan, sel) {
+  if (!plan) return;
+  sel.value = '';
+  try {
+    const data = await req('PATCH', '/admin/users/' + userId + '/plan', { plan });
+    toast('✅ ' + data.message);
+    loadUsers(currentPage, currentSearch);
+  } catch(e) { toast('Erro: ' + e.message, true); }
+}
+
+async function suspendUser(userId, nickname) {
+  if (!confirm('Suspender o usuário ' + nickname + '? Esta ação desativa a conta.')) return;
+  try {
+    const data = await req('DELETE', '/admin/users/' + userId);
+    toast('✅ ' + data.message);
+    loadUsers(currentPage, currentSearch);
+    loadStats();
+  } catch(e) { toast('Erro: ' + e.message, true); }
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, isErr = false) {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-icon').textContent = isErr ? '⚠️' : '✅';
+  document.getElementById('toast-msg').textContent  = msg;
+  el.classList.toggle('err', isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(function init() {
+  // Auto-login se já tem token salvo e validado
+  const savedAdminToken = localStorage.getItem('cv_admin_token');
+  if (savedAdminToken) {
+    adminToken = savedAdminToken;
+    showPanel();
+  }
+  // Enter no campo de senha
+  document.getElementById('admin-pass')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doAdminLogin();
+  });
+})();
+</script>
+</body>
+</html>
