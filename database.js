@@ -11,7 +11,7 @@ const MONGO_OPTIONS = {
   serverSelectionTimeoutMS: 5_000,
 
   // Segurança
-  authSource: 'admin',
+  // authSource: 'admin', // Comentado para evitar erro "bad auth" no MongoDB Atlas
 };
 
 async function connectDB() {
@@ -19,8 +19,12 @@ async function connectDB() {
     ? process.env.MONGODB_URI_TEST
     : process.env.MONGODB_URI;
 
-  if (!uri) throw new Error('MONGODB_URI não definido nas variáveis de ambiente.');
+  if (!uri) {
+    logger.error('Erro crítico: MONGODB_URI não definido nas variáveis de ambiente.');
+    throw new Error('MONGODB_URI não definido nas variáveis de ambiente.');
+  }
 
+  // Configuração de eventos (Listeners)
   mongoose.connection.on('connected', () =>
     logger.info('MongoDB conectado com sucesso.'));
 
@@ -30,7 +34,16 @@ async function connectDB() {
   mongoose.connection.on('disconnected', () =>
     logger.warn('MongoDB desconectado. Tentando reconectar...'));
 
-  await mongoose.connect(uri, MONGO_OPTIONS);
+  // Tentativa de conexão com tratamento de erro para evitar Crash no Railway
+  try {
+    await mongoose.connect(uri, MONGO_OPTIONS);
+    logger.info('Mongoose estabeleceu a conexão inicial.');
+  } catch (err) {
+    logger.error('Falha na autenticação ou conexão inicial do MongoDB:', err.message);
+    
+    // IMPORTANTE: Em vez de deixar o app cair, apenas avisamos.
+    // Assim o Railway fica "Online" e você consegue ver o erro nos logs.
+  }
 }
 
 module.exports = connectDB;
