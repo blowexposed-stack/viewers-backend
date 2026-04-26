@@ -2,17 +2,38 @@
 const express = require('express');
 const router  = express.Router();
 
-// IMPORTANTE: Se o controller estiver na mesma pasta, use './'
-const ctrl    = require('./streamer.controller'); 
+const ctrl = require('./streamer.controller');
+const { authenticate } = require('./auth');
 
-const { authenticate } = require('./auth'); // Verifique se o arquivo chama auth.js ou auth.middleware.js
+// 🔒 função pra evitar crash se algo estiver undefined
+function safeRoute(handler) {
+  if (typeof handler !== 'function') {
+    throw new Error('Handler da rota não é uma função válida');
+  }
+  return handler;
+}
 
-// LINHA 13: Agora o ctrl.getLiveStreamers NÃO será mais Undefined
-router.get('/', ctrl.getLiveStreamers);
+// ROTAS
+router.get('/', safeRoute(ctrl.getLiveStreamers));
 
-router.get('/me', authenticate, ctrl.getMyStream);
-router.patch('/me/go-live', authenticate, ctrl.goLive);
-router.patch('/me/go-offline', authenticate, ctrl.goOffline);
-router.post('/me/drain', authenticate, ctrl.drainTokens);
+router.get('/me',
+  authenticate,
+  safeRoute(ctrl.getMyStream)
+);
+
+router.patch('/me/go-live',
+  authenticate,
+  safeRoute(ctrl.goLive)
+);
+
+router.patch('/me/go-offline',
+  authenticate,
+  safeRoute(ctrl.goOffline)
+);
+
+router.post('/me/drain',
+  authenticate,
+  safeRoute(ctrl.drainTokens)
+);
 
 module.exports = router;
