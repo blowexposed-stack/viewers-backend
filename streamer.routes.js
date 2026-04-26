@@ -1,31 +1,29 @@
-// Dentro de streamer.controller.js
-exports.goLive = async (req, res) => {
-  try {
-    const streamer = await Streamer.findOne({ user: req.user.id });
+'use strict';
+const express = require('express');
+const router  = express.Router();
 
-    if (!streamer) {
-      return res.status(404).json({ message: 'Streamer não encontrado' });
-    }
+// Importe o controller onde você colou a função goLive
+const ctrl    = require('../controllers/streamer.controller'); 
 
-    // REMOVA OU COMENTE A TRAVA DO 409
-    // Se o código tiver algo como: if (streamer.isLive) return res.status(409)... APAGUE.
+// Importe os seus middlewares (ajuste o caminho se a pasta for diferente)
+const { authenticate } = require('../middlewares/auth');
+const { paginationRules, validate } = require('../middlewares/validate');
 
-    streamer.isLive = true;
-    streamer.lastWentLive = new Date();
-    await streamer.save();
+// Definição das Rotas
+// Listar todos os streamers que estão online
+router.get('/', paginationRules, validate, ctrl.getLiveStreamers);
 
-    // Se você configurou o Socket.io no server.js, pode avisar aqui:
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('streamer-online', streamer);
-    }
+// Pegar os dados do próprio perfil (requer login)
+router.get('/me', authenticate, ctrl.getMyStream);
 
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Você está ao vivo!',
-      data: streamer 
-    });
-  } catch (error) {
-    return res.status(500).json({ message: 'Erro ao entrar ao vivo' });
-  }
-};
+// Rota que você corrigiu (Ligar Live)
+router.patch('/me/go-live', authenticate, ctrl.goLive);
+
+// Rota para desligar a live
+router.patch('/me/go-offline', authenticate, ctrl.goOffline);
+
+// Rota de tokens/finanças
+router.post('/me/drain', authenticate, ctrl.drainTokens);
+
+// --- ESSA LINHA ABAIXO É A QUE ESTÁ FALTANDO E CAUSA O ERRO NO RAILWAY ---
+module.exports = router;
