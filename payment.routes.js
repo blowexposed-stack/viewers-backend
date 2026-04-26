@@ -1,18 +1,16 @@
 'use strict';
-
-const express  = require('express');
-const router   = express.Router();
-const ctrl     = require('./payment.controller');
+const express = require('express');
+const router  = express.Router();
+const ctrl    = require('./payment.controller'); // Certifique-se que o caminho está certo
 const { authenticate } = require('./auth');
 
-// ─── WEBHOOK MP (sem auth JWT, body raw) ─────────────────────────────────────
+// Webhook Mercado Pago
 router.post('/webhook', express.json(), ctrl.mpWebhook);
 
-// ─── Planos (público) ─────────────────────────────────────────────────────────
+// Listar planos
 router.get('/plans', ctrl.getPlans);
 
-// ─── Rotas autenticadas ───────────────────────────────────────────────────────
-router.use(authenticate);
-router.get('/history', ctrl.getHistory);
+// Histórico (precisa estar logado)
+router.get('/history', authenticate, ctrl.getHistory);
 
 module.exports = router;
