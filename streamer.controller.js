@@ -1,5 +1,6 @@
 'use strict';
-const Streamer = require('./Streamer'); // Verifique se o nome do arquivo de Model está correto (ex: Streamer.js ou streamer.model.js)
+// IMPORTANTE: Verifique se no seu GitHub o arquivo se chama Streamer.js ou streamer.js
+const Streamer = require('./Streamer'); 
 
 // LISTAR STREAMERS AO VIVO
 exports.getLiveStreamers = async (req, res) => {
@@ -7,9 +8,10 @@ exports.getLiveStreamers = async (req, res) => {
     const streamers = await Streamer.find({ isLive: true }).lean();
     return res.json({
       success: true,
-      data: streamers
+      data: streamers || []
     });
   } catch (err) {
+    console.error('Erro ao buscar streamers:', err);
     return res.status(500).json({ success: false, message: 'Erro ao buscar streamers' });
   }
 };
@@ -17,22 +19,39 @@ exports.getLiveStreamers = async (req, res) => {
 // MINHA STREAM
 exports.getMyStream = async (req, res) => {
   try {
-    const streamer = await Streamer.findOne({ user: req.user._id }).lean();
+    const userId = req.user._id || req.user.id;
+    const streamer = await Streamer.findOne({ user: userId }).lean();
     return res.json({ success: true, data: streamer });
   } catch (err) {
     return res.status(500).json({ success: false });
   }
 };
 
-// GO LIVE (Lógica Real)
+// GO LIVE (Lógica Reforçada)
 exports.goLive = async (req, res) => {
   try {
-    // Procura o registro do streamer pelo ID do usuário logado
+    // Pega o ID do usuário de forma segura
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId) {
+      console.error('ERRO: Usuário não identificado na requisição');
+      return res.status(401).json({ success: false, message: 'Usuário não autenticado' });
+    }
+
+    console.log(`[LOG] Ativando live para o usuario: ${userId}`);
+
     const streamer = await Streamer.findOneAndUpdate(
-      { user: req.user._id },
-      { isLive: true, lastWentLive: new Date() },
-      { new: true, upsert: true } // Se não existir, ele cria um
+      { user: userId },
+      { 
+        isLive: true, 
+        lastWentLive: new Date() 
+      },
+      { new: true, upsert: true } // Se não existir registro de streamer para esse user, ele cria agora
     );
+
+    // Se você usa Socket.io, ele deve ser disparado aqui
+    const io = req.app.get('io');
+    if (io) io.emit('streamer:online', streamer);
 
     return res.json({ 
       success: true, 
@@ -40,26 +59,37 @@ exports.goLive = async (req, res) => {
       data: streamer 
     });
   } catch (err) {
-    console.error('Erro no goLive:', err);
-    return res.status(500).json({ success: false, message: 'Erro ao iniciar live' });
+    console.error('ERRO DETALHADO NO GO-LIVE:', err);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Erro ao iniciar live',
+      error: err.message 
+    });
   }
 };
 
 // GO OFFLINE
 exports.goOffline = async (req, res) => {
   try {
-    await Streamer.findOneAndUpdate(
-      { user: req.user._id },
-      { isLive: false }
+    const userId = req.user?._id || req.user?.id;
+    
+    const streamer = await Streamer.findOneAndUpdate(
+      { user: userId },
+      { isLive: false },
+      { new: true }
     );
+
+    const io = req.app.get('io');
+    if (io) io.emit('streamer:offline', { userId });
+
     return res.json({ success: true, message: 'Live encerrada' });
   } catch (err) {
+    console.error('Erro ao encerrar live:', err);
     return res.status(500).json({ success: false });
   }
 };
 
 // DRAIN TOKENS
 exports.drainTokens = async (req, res) => {
-  // Sua lógica de tokens aqui depois
   return res.json({ success: true });
 };
