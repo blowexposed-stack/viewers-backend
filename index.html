@@ -1416,12 +1416,13 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // ════════════════════════════════════════════════════════════
 //  MINHAS TRANSMISSÕES
 // ════════════════════════════════════════════════════════════
+// --- INÍCIO DO BLOCO CORRIGIDO ---
+
 async function loadMyStreams() {
   try {
     const data = await api('GET', '/streamers/me');
     if (data && data.data) {
       STATE.myStreams = [data.data];
-      STATE.isLive = data.data.isLive;
     } else if (STATE.user?.liveNick) {
       STATE.myStreams = [{
         user: {
@@ -1429,15 +1430,94 @@ async function loadMyStreams() {
           liveNick: STATE.user.liveNick,
           nickname: STATE.user.nickname,
         },
-        isLive: false, 
-        totalViewers: 0, todayViewers: 0, monthViewers: 0
+        isLive: false, totalViewers:0, todayViewers:0, monthViewers:0
       }];
-      STATE.isLive = false;
+    } else {
+      STATE.myStreams = [];
     }
-  } catch (e) {
-    console.error("Erro ao carregar streams:", e);
+  } catch(e) {
+    if (STATE.user?.liveNick) {
+      STATE.myStreams = [{
+        user: { platform: STATE.user.platform||'twitch', liveNick: STATE.user.liveNick, nickname: STATE.user.nickname },
+        isLive: false, totalViewers:0, todayViewers:0, monthViewers:0
+      }];
+    } else {
+      STATE.myStreams = [];
+    }
   }
   renderMyStreams();
+}
+
+function renderMyStreams() {
+  const u = STATE.user;
+  const planSlots = { none:1, starter:2, pro:3, elite:5 };
+  const maxSlots  = planSlots[u?.activePlan || 'none'] || 1;
+  
+  setText('slots-used', STATE.myStreams.length);
+  setText('slots-total', maxSlots);
+
+  const addBox = document.getElementById('add-stream-box');
+  if (addBox) addBox.style.display = STATE.myStreams.length >= maxSlots ? 'none' : '';
+
+  const platEmoji = { twitch:'💜', youtube:'🔴', kick:'🟢', facebook:'🔵' };
+  const platNames = { twitch:'Twitch', youtube:'YouTube', kick:'Kick', facebook:'Facebook' };
+
+  const rowsEl = document.getElementById('my-streams-rows');
+  if (!rowsEl) return;
+
+  if (STATE.myStreams.length === 0) {
+    rowsEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">Nenhum canal cadastrado. Adicione seu canal acima.</div>`;
+    return;
+  }
+
+  rowsEl.innerHTML = STATE.myStreams.map((s, i) => {
+    const plat  = s.user?.platform || u?.platform || 'twitch';
+    const nick  = s.user?.liveNick || u?.liveNick || '—';
+    const isLive = s.isLive;
+    return `<div class="streams-table-row">
+      <div class="stream-channel-info">
+        <div class="stream-plat-logo">${platEmoji[plat]||'📺'}</div>
+        <div>
+          <div class="stream-channel-name">${nick}</div>
+          <div style="font-size:11px;color:var(--text3)">${platNames[plat]||plat}</div>
+          <div class="stream-edit-link" onclick="editChannel(${i})">[ EDITAR CANAL ]</div>
+        </div>
+      </div>
+      <div class="stream-stat">${s.totalViewers || 0}</div>
+      <div class="stream-stat">${s.todayViewers || 0}</div>
+      <div class="stream-stat">${s.monthViewers || 0}</div>
+      <div class="stream-status-cell">
+        <div class="${isLive ? 'status-online' : 'status-offline'}">
+          ${isLive ? '🟢 ONLINE' : '🔴 OFFLINE'}
+        </div>
+        <div class="toggle-wrap" style="margin-top:6px">
+          <label class="toggle">
+            <input type="checkbox" ${isLive?'checked':''} onchange="toggleStream(${i}, this)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">${isLive?'ON':'OFF'}</span>
+        </div>
+        <div class="status-note">Atualizado automaticamente</div>
+      </div>
+      <button class="btn-delete" onclick="deleteStream(${i})" title="Remover">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+async function addStream() {
+  const plat = document.getElementById('add-plat').value;
+  const nick = document.getElementById('add-channel').value.trim();
+  if (!nick) { toast('Informe o nick do canal!', true); return; }
+  try {
+    await api('PATCH', '/users/me', { platform: plat, liveNick: nick });
+    STATE.user.platform = plat;
+    STATE.user.liveNick = nick;
+    localStorage.setItem('cv_user', JSON.stringify(STATE.user));
+    await api('PATCH', '/streamers/me/go-live', { streamTitle: '', game: '', liveNick: nick }).catch(()=>{});
+    await loadMyStreams();
+    document.getElementById('add-channel').value = '';
+    toast('✅ Canal adicionado com sucesso!');
+  } catch(e) { toast('Erro ao adicionar: ' + e.message, true); }
 }
 
 async function toggleStream(i, el) {
@@ -1446,98 +1526,57 @@ async function toggleStream(i, el) {
   if (label) label.textContent = isOn ? 'ON' : 'OFF';
 
   if (isOn && STATE.tokens < 2) {
-    el.checked = false;
-    if (label) label.textContent = 'OFF';
-    return toast('⚠️ Saldo insuficiente! Você precisa de 2 tokens.', true);
+      el.checked = false;
+      if (label) label.textContent = 'OFF';
+      toast('⚠️ Saldo insuficiente!', true);
+      return;
   }
 
   try {
     if (isOn) {
       const nick = STATE.myStreams[i]?.user?.liveNick || STATE.user?.liveNick || '';
       await api('PATCH', '/streamers/me/go-live', { streamTitle: '', game: '', liveNick: nick });
-      STATE.isLive = true;
-      if (STATE.user) STATE.user.isLive = true;
       startDrain();
     } else {
       await api('PATCH', '/streamers/me/go-offline');
-      STATE.isLive = false;
-      if (STATE.user) STATE.user.isLive = false;
       stopDrain();
     }
-
-    localStorage.setItem('cv_user', JSON.stringify(STATE.user));
-    
-    if (STATE.socket?.connected) {
-      STATE.socket.emit('toggle_live', { isLive: STATE.isLive });
-    }
-
-    updateUI();
-    toast(isOn ? '🟢 Live ativada no sistema!' : '🔴 Live desativada.');
-    setTimeout(loadMyStreams, 500);
-
-  } catch (e) {
+    // IMPORTANTE: Recarregar para o estado persistir no STATE
+    await loadMyStreams();
+    toast(isOn ? '🟢 Live ativada!' : '🔴 Live desativada!');
+  } catch(e) {
     el.checked = !isOn;
     if (label) label.textContent = el.checked ? 'ON' : 'OFF';
     toast('Erro: ' + e.message, true);
   }
 }
 
-// SUA FUNÇÃO DO ROBÔ (MANTIDA E ORGANIZADA)
+function editChannel(i) {
+  const s = STATE.myStreams[i];
+  const plat = s.user?.platform || STATE.user?.platform || 'twitch';
+  const nick = s.user?.liveNick || '';
+  const newNick = prompt(`Editar nick:`, nick);
+  if (newNick === null || !newNick.trim()) return;
+  STATE.user.liveNick = newNick.trim();
+  localStorage.setItem('cv_user', JSON.stringify(STATE.user));
+  api('PATCH', '/users/me', { liveNick: newNick.trim() }).then(() => loadMyStreams());
+  toast('✅ Canal atualizado!');
+}
+
+async function deleteStream(i) {
+  if (!confirm('Remover este canal?')) return;
+  try { await api('PATCH', '/streamers/me/go-offline'); } catch {}
+  STATE.myStreams.splice(i, 1);
+  renderMyStreams();
+  toast('Canal removido.');
+}
+
 function toggleASSD(el) {
   const label = document.getElementById('assd-label');
   if (label) label.textContent = el.checked ? 'ON' : 'OFF';
-  // O ícone 🤖 continua aqui no toast como você gosta
   toast(el.checked ? '🤖 ASSD ativado!' : '🤖 ASSD desativado!');
 }
-
-function renderMyStreams() {
-  const u = STATE.user;
-  const planSlots = { none: 1, starter: 2, pro: 3, elite: 5 };
-  const maxSlots = planSlots[u?.activePlan || 'none'] || 1;
-  
-  setText('slots-used', STATE.myStreams.length);
-  setText('slots-total', maxSlots);
-
-  const rowsEl = document.getElementById('my-streams-rows');
-  if (!rowsEl) return;
-
-  if (STATE.myStreams.length === 0) {
-    rowsEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3)">Nenhum canal cadastrado.</div>`;
-    return;
-  }
-
-  const platEmoji = { twitch: '💜', youtube: '🔴', kick: '🟢', facebook: '🔵' };
-
-  rowsEl.innerHTML = STATE.myStreams.map((s, i) => {
-    const isLive = s.isLive;
-    return `
-      <div class="streams-table-row">
-        <div class="stream-channel-info">
-          <div class="stream-plat-logo">${platEmoji[s.user?.platform] || '📺'}</div>
-          <div>
-            <div class="stream-channel-name">${s.user?.liveNick || '—'}</div>
-            <div class="stream-edit-link" onclick="editChannel(${i})">[ EDITAR ]</div>
-          </div>
-        </div>
-        <div class="stream-stat">${s.totalViewers || 0}</div>
-        <div class="stream-stat">${s.todayViewers || 0}</div>
-        <div class="stream-stat">${s.monthViewers || 0}</div>
-        <div class="stream-status-cell">
-          <div class="${isLive ? 'status-online' : 'status-offline'}">
-            ${isLive ? '🟢 ONLINE' : '🔴 OFFLINE'}
-          </div>
-          <div class="toggle-wrap" style="margin-top:6px">
-            <label class="toggle">
-              <input type="checkbox" ${isLive ? 'checked' : ''} onchange="toggleStream(${i}, this)">
-              <span class="toggle-slider"></span>
-            </label>
-            <span class="toggle-label">${isLive ? 'ON' : 'OFF'}</span>
-          </div>
-        </div>
-        <button class="btn-delete" onclick="deleteStream(${i})">🗑️</button>
-      </div>`;
-  }).join('');
-}
+// --- FIM DO BLOCO ---
 // ════════════════════════════════════════════════════════════
 //  PLANOS
 // ════════════════════════════════════════════════════════════
