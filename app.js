@@ -24,19 +24,23 @@ const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5500')
-  .split(',').map(o => o.trim());
-
-// Substitua as linhas 31 até 40 por isso:
+// CORS configurado para aceitar as requisições da Vercel sem bloqueios
 app.use(cors({
-  origin: true, // Isso permite que qualquer origem que envie as credenciais seja aceita
+  origin: true, 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-const limiter = rateLimit({ windowMs: 15*60*1000, max: 100, standardHeaders: true, legacyHeaders: false });
-const authLimiter = rateLimit({ windowMs: 15*60*1000, max: 10 });
+// AJUSTE: Aumentamos o limite para 2000 requisições para evitar o erro 429 durante seus testes
+const limiter = rateLimit({ 
+  windowMs: 15 * 60 * 1000, 
+  max: 2000, 
+  standardHeaders: true, 
+  legacyHeaders: false 
+});
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 
 app.use('/api/', limiter);
 app.use(express.json({ limit: '10kb' }));
