@@ -1137,36 +1137,48 @@ function openStreamTab(url) {
 // ════════════════════════════════════════════════════════════
 //  ASSISTIR — SESSÃO COM 3 ABAS REAIS
 // ════════════════════════════════════════════════════════════
+  
 async function checkAvailableLives() {
   await loadLives();
   const msgEl = document.getElementById('watch-avail-msg');
   const btnEl = document.getElementById('btn-start-watch');
+  
+  if (!msgEl || !btnEl) return;
+
   if (SESSION.livePool.length === 0) {
-    msgEl.innerHTML = '<span style="color:var(--red)">⚠️ Nenhuma live ativa no momento. Volte mais tarde ou convide outros streamers!</span>';
+    msgEl.innerHTML = '<span style="color:var(--red)">⚠️ Nenhuma live ativa no momento. Volte mais tarde!</span>';
     btnEl.disabled = true;
     btnEl.style.opacity = '.5';
   } else {
-    // Aviso se sem tokens
     if (STATE.tokens < 2) {
-      msgEl.innerHTML = '<span style="color:var(--gold)">💡 Você pode ganhar tokens assistindo as lives abaixo! Clique em "Assistir agora" para começar.</span>';
+      msgEl.innerHTML = '<span style="color:var(--gold)">💡 Ganhe tokens assistindo as lives abaixo!</span>';
+    } else {
+      msgEl.textContent = SESSION.livePool.length + ' live(s) disponível(is) para assistir';
     }
-    msgEl.textContent = SESSION.livePool.length + ' live(s) disponível(is) para assistir';
     btnEl.disabled = false;
     btnEl.style.opacity = '1';
   }
 }
 
-const PLAT_URL = { twitch:'https://twitch.tv/', youtube:'https://youtube.com/@', kick:'https://kick.com/', facebook:'https://facebook.com/' };
+const PLAT_URL = { 
+  twitch: 'https://twitch.tv/', 
+  youtube: 'https://youtube.com/@', 
+  kick: 'https://kick.com/', 
+  facebook: 'https://facebook.com/' 
+};
 
-// Pega N streamers DIFERENTES do pool (nunca repete na mesma rodada)
 function pickUnique(pool, count, exclude = []) {
   const available = pool.filter(s => !exclude.includes(s.nick));
-  const source    = available.length >= count ? available : pool; // fallback se pool pequeno
-  const result    = [];
-  const used      = new Set(exclude);
-  const shuffled  = [...source].sort(() => Math.random() - 0.5);
+  const source = available.length >= count ? available : pool;
+  const result = [];
+  const used = new Set(exclude);
+  const shuffled = [...source].sort(() => Math.random() - 0.5);
+  
   for (const s of shuffled) {
-    if (!used.has(s.nick)) { result.push(s); used.add(s.nick); }
+    if (!used.has(s.nick)) { 
+      result.push(s); 
+      used.add(s.nick); 
+    }
     if (result.length >= count) break;
   }
   return result;
@@ -1177,241 +1189,168 @@ async function startSession() {
 
   await loadLives();
   if (SESSION.livePool.length === 0) {
-    toast('Nenhuma live disponível agora. Ative sua live ou convide outros!', true);
+    toast('Nenhuma live disponível agora.', true);
     return;
   }
 
-  // Pega até 3 streamers diferentes (plataformas variadas se possível)
+  // Tenta pegar 3 streamers diferentes
   const picked = pickUnique(SESSION.livePool, 3);
 
-  // Abre 1 aba por streamer — todas diferentes
+  // Abre as abas reais no navegador
   picked.forEach(s => {
-    const url = (PLAT_URL[s.platform] || 'https://twitch.tv/') + s.nick;
-    window.open(url, '_blank');
+    if (!s.empty) {
+      const url = (PLAT_URL[s.platform] || 'https://twitch.tv/') + s.nick;
+      window.open(url, '_blank');
+    }
   });
 
-  // Preenche slots vazios com placeholder se tiver menos de 3 streamers
+  // Preenche placeholders se houver menos de 3 lives
   while (picked.length < 3) {
-    picked.push({ nick:'—', nickname:'Aguardando...', platform:'twitch', empty:true });
+    picked.push({ nick: '—', nickname: 'Aguardando...', platform: 'twitch', empty: true });
   }
 
-  SESSION.active        = true;
-  SESSION.slots         = picked.map(s => ({ ...s, secsLeft: s.empty ? 0 : SESSION_SECS, earned:false, rotating:false, readyToRotate:false }));
+  SESSION.active = true;
+  SESSION.slots = picked.map(s => ({ 
+    ...s, 
+    secsLeft: s.empty ? 0 : SESSION_SECS, // SESSION_SECS deve ser 600
+    earned: false, 
+    rotating: false, 
+    readyToRotate: false 
+  }));
+  
   SESSION.sessionTokens = 0;
-  SESSION.cycleTokensDeducted = false;
+  SESSION.totalMinutes = 0;
 
   document.getElementById('watch-session').classList.add('active');
   document.getElementById('watch-start-area').style.display = 'none';
   renderSlots();
 
+  // Inicia o relógio mestre
   SESSION.masterInterval = setInterval(sessionTick, 1000);
-  toast('▶ ' + picked.filter(s=>!s.empty).length + ' aba(s) abertas! Assistindo ' + picked.filter(s=>!s.empty).map(s=>s.nickname).join(', '));
+  
+  const activeAbas = picked.filter(s => !s.empty).length;
+  toast(`▶ ${activeAbas} aba(s) abertas! Aguarde o ciclo de 10 min.`);
 }
 
 function sessionTick() {
-  let allDone = true;
+  if (!SESSION.active) return;
+
   SESSION.slots.forEach((slot, i) => {
-    if (slot.rotating) return;
+    if (slot.rotating || slot.empty) return;
+
     slot.secsLeft--;
+
     if (slot.secsLeft <= 0) {
-      allDone = false;
-      rotateSlot(i);
+      // SÓ GANHA TOKENS QUANDO O TEMPO ZERA
+      prepararRotacao(i);
     } else {
-      allDone = false;
       updateSlotTimer(i);
     }
   });
   updateSessionHeader();
 }
 
+async function prepararRotacao(i) {
+  const slot = SESSION.slots[i];
+  if (slot.rotating || slot.earned) return;
 
-// ─── Drain: desconta tokens da live ativa a cada 60s ─────────────────────────
-let drainInterval = null;
+  slot.earned = true;
+  slot.rotating = true;
+  renderSlotRotating(i);
 
-function startDrain() {
-  stopDrain();
-  drainInterval = setInterval(async () => {
-    if (!STATE.user) return;
-    try {
-      const data = await api('POST', '/streamers/me/drain', { tabs: 3 });
-      if (!data.success && data.liveDowned) {
-        // Live derrubada por saldo insuficiente
-        const rowsEl = document.getElementById('my-streams-rows');
-        if (rowsEl) loadMyStreams();
-        toast('⚠️ Saldo insuficiente! Sua live foi desativada. Assista outras lives para ganhar tokens.', true);
-        stopDrain();
-      } else if (data.newBalance !== undefined) {
-        STATE.tokens = data.newBalance;
-        updateUI();
-      }
-    } catch {}
-  }, 60000); // a cada 60s
-}
+  // 1. Calcula ganho baseado no plano
+  const valorGanho = getSessionTokens(); // Ex: 2 tokens
+  
+  // 2. Atualiza Local
+  SESSION.sessionTokens += valorGanho;
+  SESSION.totalMinutes += 10;
+  STATE.tokens += valorGanho;
+  STATE.minutes = (STATE.minutes || 0) + 10;
 
-function stopDrain() {
-  if (drainInterval) { clearInterval(drainInterval); drainInterval = null; }
+  showTokenFloat(`+${valorGanho} 🪙`);
+  updateUI();
+
+  // 3. Envia para o Banco (Railway)
+  try {
+    await api('POST', '/tokens/earn', { amount: valorGanho, minutes: 10 });
+  } catch (e) {
+    console.error("Erro ao salvar tokens no banco:", e);
+  }
+
+  // 4. Aguarda 3s e troca de Streamer
+  await sleep(3000);
+  rotateSlot(i);
 }
 
 async function rotateSlot(i) {
-  const slot = SESSION.slots[i];
-  if (!slot || slot.rotating) return;
-
-  slot.rotating      = true;
-  slot.readyToRotate = true;
-  renderSlotRotating(i);
-
-  // ── Crédito de tokens: cada slot credita individualmente ao terminar ───────
-  // (não espera os 3 — cada aba de 10 min vale tokens)
-  const earned = getSessionTokens();  // 2 / 2.5 / 3.5 / 6 conforme plano
-  SESSION.sessionTokens += earned;
-  SESSION.totalMinutes  += 10;
-  STATE.tokens           = Math.max(0, STATE.tokens + earned);
-  STATE.minutes          = (STATE.minutes || 0) + 10;
-
-  showTokenFloat('+' + earned + ' 🪙');
-
-  setText('ws-tok',  SESSION.sessionTokens.toFixed(1));
-  setText('ws-min',  SESSION.totalMinutes);
-  setText('sb-tokens', Math.floor(STATE.tokens));
-  setText('inv-tokens', Math.floor(STATE.tokens));
-  setText('inv-minutes', STATE.minutes);
-
-  // Se TODOS os 3 terminaram ao mesmo tempo → incrementa sessão completa
-  const allReady = SESSION.slots.every(s => s.rotating && s.readyToRotate);
-  if (allReady) {
-    SESSION.totalSessions++;
-    setText('ws-sess', SESSION.totalSessions);
-  }
-
-  // Credita via API (async)
-  api('POST', '/tokens/earn')
-    .then(d => { if (d?.newBalance !== undefined) { STATE.tokens = d.newBalance; updateUI(); } })
-    .catch(() => {});
-
-  // ── Aguarda 3s de transição ────────────────────────────────────────────────
-  await sleep(3000);
   await loadLives();
 
-  // ── Escolhe próximo streamer DIFERENTE dos que estão nas outras abas ───────
-  const activeNicks = SESSION.slots
-    .filter((s, idx) => idx !== i && !s.rotating)
-    .map(s => s.nick)
-    .filter(Boolean);
+  // Pega nicks das outras abas para não repetir
+  const nicksAtivos = SESSION.slots
+    .filter((s, idx) => idx !== i && !s.empty)
+    .map(s => s.nick);
 
-  const nextList = pickUnique(SESSION.livePool, 1, activeNicks);
+  const proximo = pickUnique(SESSION.livePool, 1, nicksAtivos);
 
-  if (!nextList.length) {
-    // Sem lives disponíveis para este slot
-    SESSION.slots[i] = { nick:'—', nickname:'Aguardando live...', platform:'twitch', secsLeft:0, rotating:false, readyToRotate:false, empty:true };
+  if (!proximo.length) {
+    SESSION.slots[i] = { nick: '—', nickname: 'Sem lives...', platform: 'twitch', secsLeft: 0, rotating: false, empty: true };
     renderSlotEmpty(i);
-    updateUI();
-    return;
-  }
+  } else {
+    const next = proximo[0];
+    window.open((PLAT_URL[next.platform] || 'https://twitch.tv/') + next.nick, '_blank');
 
-  const next = nextList[0];
-
-  // Abre nova aba no navegador — streamer diferente das outras abas
-  window.open((PLAT_URL[next.platform] || 'https://twitch.tv/') + next.nick, '_blank');
-
-  SESSION.slots[i] = {
-    ...next,
-    secsLeft:      SESSION_SECS,
-    earned:        false,
-    rotating:      false,
-    readyToRotate: false,
-    empty:         false,
-  };
-  renderSlot(i);
-  updateUI();
-}
-
-function stopSession() {
-  SESSION.active = false;
-  clearInterval(SESSION.masterInterval);
-  document.getElementById('watch-session').classList.remove('active');
-  document.getElementById('watch-start-area').style.display = '';
-  if (SESSION.sessionTokens > 0) {
-    toast('✅ Sessão encerrada! +' + SESSION.sessionTokens.toFixed(1) + ' tokens ganhos!');
-  }
-  checkAvailableLives();
-  updateUI();
-}
-
-function renderSlots() {
-  const container = document.getElementById('ws-slots');
-  container.innerHTML = '';
-  SESSION.slots.forEach((_, i) => {
-    const div = document.createElement('div');
-    div.className = 'ws-slot';
-    div.id = 'ws-slot-' + i;
-    container.appendChild(div);
+    SESSION.slots[i] = {
+      ...next,
+      secsLeft: SESSION_SECS,
+      earned: false,
+      rotating: false,
+      empty: false
+    };
     renderSlot(i);
-  });
+  }
+  updateUI();
 }
+
+// --- Funções de Interface (Mantidas e Otimizadas) ---
 
 function renderSlot(i) {
-  const s   = SESSION.slots[i];
-  const el  = document.getElementById('ws-slot-' + i);
+  const s = SESSION.slots[i];
+  const el = document.getElementById('ws-slot-' + i);
   if (!el) return;
-  const platEmoji = { twitch:'💜', youtube:'🔴', kick:'🟢', facebook:'🔵' };
+  const platEmoji = { twitch: '💜', youtube: '🔴', kick: '🟢', facebook: '🔵' };
+  
   el.innerHTML = `
     <div class="ws-slot-head">
       <div>
         <div class="ws-slot-name">${s.nickname}</div>
         <div style="font-size:11px;color:var(--text3)">${s.nick}</div>
       </div>
-      <div class="ws-slot-plat">${platEmoji[s.platform]||'📺'}</div>
+      <div class="ws-slot-plat">${platEmoji[s.platform] || '📺'}</div>
     </div>
     <div class="ws-slot-timer" id="slot-timer-${i}">${fmtTime(s.secsLeft)}</div>
     <div class="ws-slot-prog"><div class="ws-slot-prog-fill" id="slot-prog-${i}" style="width:${pct(s.secsLeft)}%"></div></div>
-    <div class="ws-slot-status">⏱ ${fmtTime(s.secsLeft)} restantes</div>
-    <div class="ws-slot-earn" id="slot-earn-${i}"></div>`;
-}
-
-function renderSlotRotating(i) {
-  const el = document.getElementById('ws-slot-' + i);
-  if (!el) return;
-  el.innerHTML = `<div class="ws-slot-rotating"><div class="spinner"></div><div>Carregando próxima live...</div></div>`;
-}
-
-function renderSlotEmpty(i) {
-  const el = document.getElementById('ws-slot-' + i);
-  if (!el) return;
-  el.innerHTML = `<div class="ws-slot-rotating"><div style="font-size:32px;opacity:.4">📡</div><div>Sem lives disponíveis</div></div>`;
+    <div class="ws-slot-status">⏱ ${fmtTime(s.secsLeft)} restantes</div>`;
 }
 
 function updateSlotTimer(i) {
   const s = SESSION.slots[i];
   const timerEl = document.getElementById('slot-timer-' + i);
-  const progEl  = document.getElementById('slot-prog-' + i);
-  if (timerEl) { timerEl.textContent = fmtTime(s.secsLeft); timerEl.className = 'ws-slot-timer' + (s.secsLeft <= 60 ? ' urgent' : ''); }
-  if (progEl)  progEl.style.width = pct(s.secsLeft) + '%';
-}
-
-function updateSessionHeader() {
-  setText('ws-tok',  SESSION.sessionTokens.toFixed(1));
-  setText('ws-min',  SESSION.totalMinutes);
-  setText('ws-sess', SESSION.totalSessions);
+  const progEl = document.getElementById('slot-prog-' + i);
+  if (timerEl) {
+    timerEl.textContent = fmtTime(s.secsLeft);
+    timerEl.className = 'ws-slot-timer' + (s.secsLeft <= 60 ? ' urgent' : '');
+  }
+  if (progEl) progEl.style.width = pct(s.secsLeft) + '%';
 }
 
 function fmtTime(secs) {
   const m = Math.floor(secs / 60), s = secs % 60;
-  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 }
 
-function pct(secs) { return Math.round(((SESSION_SECS - secs) / SESSION_SECS) * 100); }
-
-function showTokenFloat(text) {
-  const el = document.createElement('div');
-  el.className = 'token-float';
-  el.textContent = text;
-  el.style.left = (window.innerWidth / 2 - 40) + 'px';
-  el.style.top  = (window.innerHeight / 2) + 'px';
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2000);
+function pct(secs) { 
+  return Math.max(0, Math.min(100, Math.round(((SESSION_SECS - secs) / SESSION_SECS) * 100))); 
 }
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ════════════════════════════════════════════════════════════
 //  MINHAS TRANSMISSÕES
