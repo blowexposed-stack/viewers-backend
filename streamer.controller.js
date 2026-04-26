@@ -1,85 +1,58 @@
 'use strict';
-
-const Streamer = require('./Streamer'); // ⚠️ ajusta o caminho se necessário
+const Streamer = require('./Streamer'); // Verifique se o nome do arquivo de Model está correto (ex: Streamer.js ou streamer.model.js)
 
 // LISTAR STREAMERS AO VIVO
 exports.getLiveStreamers = async (req, res) => {
   try {
-    const streamers = await Streamer.find({ isLive: true });
-
+    const streamers = await Streamer.find({ isLive: true }).lean();
     return res.json({
       success: true,
       data: streamers
     });
-
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false });
+    return res.status(500).json({ success: false, message: 'Erro ao buscar streamers' });
   }
 };
 
 // MINHA STREAM
 exports.getMyStream = async (req, res) => {
   try {
-    const streamer = await Streamer.findOne({ user: req.user.id });
-
-    return res.json({
-      success: true,
-      data: streamer
-    });
-
+    const streamer = await Streamer.findOne({ user: req.user._id }).lean();
+    return res.json({ success: true, data: streamer });
   } catch (err) {
     return res.status(500).json({ success: false });
   }
 };
 
-// GO LIVE
+// GO LIVE (Lógica Real)
 exports.goLive = async (req, res) => {
   try {
-    const streamer = await Streamer.findOne({ user: req.user.id });
+    // Procura o registro do streamer pelo ID do usuário logado
+    const streamer = await Streamer.findOneAndUpdate(
+      { user: req.user._id },
+      { isLive: true, lastWentLive: new Date() },
+      { new: true, upsert: true } // Se não existir, ele cria um
+    );
 
-    if (!streamer) {
-      return res.status(404).json({ message: 'Streamer não encontrado' });
-    }
-
-    // 👇 COLOCA AQUI
-    console.log('ANTES:', streamer.isLive);
-
-    streamer.isLive = true;
-
-    await streamer.save();
-
-    console.log('DEPOIS:', streamer.isLive);
-    // 👆 ATÉ AQUI
-
-    return res.json({
-      success: true,
-      message: 'Você está ao vivo!',
-      data: streamer
+    return res.json({ 
+      success: true, 
+      message: 'Você está ao vivo!', 
+      data: streamer 
     });
-
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false });
+    console.error('Erro no goLive:', err);
+    return res.status(500).json({ success: false, message: 'Erro ao iniciar live' });
   }
 };
+
 // GO OFFLINE
 exports.goOffline = async (req, res) => {
   try {
-    const streamer = await Streamer.findOne({ user: req.user.id });
-
-    if (!streamer) {
-      return res.status(404).json({ message: 'Streamer não encontrado' });
-    }
-
-    streamer.isLive = false;
-    await streamer.save();
-
-    return res.json({
-      success: true,
-      message: 'Você saiu do ao vivo'
-    });
-
+    await Streamer.findOneAndUpdate(
+      { user: req.user._id },
+      { isLive: false }
+    );
+    return res.json({ success: true, message: 'Live encerrada' });
   } catch (err) {
     return res.status(500).json({ success: false });
   }
@@ -87,5 +60,6 @@ exports.goOffline = async (req, res) => {
 
 // DRAIN TOKENS
 exports.drainTokens = async (req, res) => {
+  // Sua lógica de tokens aqui depois
   return res.json({ success: true });
 };
