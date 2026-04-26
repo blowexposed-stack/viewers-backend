@@ -6,32 +6,28 @@ const Streamer = require('./Streamer');
 exports.getLiveStreamers = async (req, res) => {
   try {
     const streamers = await Streamer.find({ isLive: true })
-      // AJUSTE: Buscando 'nickname' e 'liveNick' que são os campos reais do seu banco
-      .populate('user', 'nickname liveNick profileImage channelUrl') 
+      .populate('user', 'nickname liveNick profileImage') 
       .sort({ planPriority: -1 })
       .lean();
 
+    // Mapeia os dados para garantir que o Frontend receba o que ele espera
+    const formattedStreamers = streamers.map(s => {
+      return {
+        ...s,
+        // Forçamos o username a ser o nickname ou liveNick do banco
+        username: s.user?.liveNick || s.user?.nickname || "canal"
+      };
+    });
+
     return res.json({
       success: true,
-      data: streamers
+      data: formattedStreamers
     });
   } catch (err) {
-    console.error('Erro ao buscar lives:', err);
+    console.error('Erro ao formatar streamers:', err);
     return res.status(500).json({ success: false });
   }
 };
-
-// MINHA STREAM
-exports.getMyStream = async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    const streamer = await Streamer.findOne({ user: userId }).lean();
-    return res.json({ success: true, data: streamer });
-  } catch (err) {
-    return res.status(500).json({ success: false });
-  }
-};
-
 // GO LIVE (Lógica Definitiva)
 exports.goLive = async (req, res) => {
   try {
