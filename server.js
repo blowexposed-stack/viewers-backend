@@ -2,7 +2,6 @@
 require('dotenv').config();
 
 const http      = require('http');
-// ADICIONE ESTA LINHA:
 const { Server } = require('socket.io'); 
 const app       = require('./app');
 const connectDB = require('./database');
@@ -15,17 +14,20 @@ async function startServer() {
     await connectDB();
     const server = http.createServer(app);
 
-    // ADICIONE ESTE BLOCO:
     const io = new Server(server, {
       cors: {
-        origin: "https://comunidadeviewers.vercel.app", // Isso libera o acesso da Vercel
+        origin: "https://comunidadeviewers.vercel.app", 
         methods: ["GET", "POST"]
       }
     });
 
-    // Isso faz o socket funcionar de verdade
+    // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
+    app.set('io', io);      // Para o Streamer Controller funcionar
+    global._io = io;        // Para o Payment Controller funcionar (aquele global._io)
+    // ---------------------------------------
+
     io.on('connection', (socket) => {
-      console.log('Usuário conectado:', socket.id);
+      console.log('Usuário conectado no Socket:', socket.id);
     });
 
     server.listen(PORT, () => {
