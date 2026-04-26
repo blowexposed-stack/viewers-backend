@@ -3,12 +3,11 @@
 const Streamer = require('./Streamer'); 
 
 // LISTAR STREAMERS AO VIVO
-// No seu streamer.controller.js
-
 exports.getLiveStreamers = async (req, res) => {
   try {
     const streamers = await Streamer.find({ isLive: true })
-      .populate('user', 'username profileImage') // ISSO AQUI É A CHAVE!
+      // AJUSTE: Buscando 'nickname' e 'liveNick' que são os campos reais do seu banco
+      .populate('user', 'nickname liveNick profileImage channelUrl') 
       .sort({ planPriority: -1 })
       .lean();
 
@@ -17,9 +16,11 @@ exports.getLiveStreamers = async (req, res) => {
       data: streamers
     });
   } catch (err) {
+    console.error('Erro ao buscar lives:', err);
     return res.status(500).json({ success: false });
   }
 };
+
 // MINHA STREAM
 exports.getMyStream = async (req, res) => {
   try {
@@ -83,5 +84,6 @@ exports.goOffline = async (req, res) => {
 
 // DRAIN TOKENS
 exports.drainTokens = async (req, res) => {
+  // Sua lógica de tokens aqui depois
   return res.json({ success: true });
 };
