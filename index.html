@@ -1355,22 +1355,24 @@ function pct(secs) {
 // ════════════════════════════════════════════════════════════
 //  MINHAS TRANSMISSÕES
 // ════════════════════════════════════════════════════════════
-
 async function loadMyStreams() {
   try {
-    // Busca dados reais do servidor para saber se está ONLINE ou OFFLINE no banco
-    const data = await api('GET', '/streamers/me');
+    // Busca os dados reais do servidor para saber o status atual
+    const response = await api('GET', '/streamers/me');
+    const data = response.data;
     
-    if (data && data.data) {
-      STATE.myStreams = [data.data];
-      // Sincroniza o dreno de tokens caso a live já esteja ON no servidor
-      if (data.data.isLive) {
+    if (data) {
+      STATE.myStreams = [data];
+      // Sincroniza o dreno de tokens e o estado global se estiver ON no banco
+      if (data.isLive) {
+        STATE.isLive = true;
         if (!drainInterval) startDrain();
       } else {
+        STATE.isLive = false;
         stopDrain();
       }
     } else if (STATE.user?.liveNick) {
-      // Caso não tenha registro no banco de streamers, mas tenha no perfil do usuário
+      // Monta localmente se o banco de streamers ainda não tiver o registro
       STATE.myStreams = [{
         user: {
           platform: STATE.user.platform || 'twitch',
@@ -1383,7 +1385,7 @@ async function loadMyStreams() {
       STATE.myStreams = [];
     }
   } catch (e) {
-    console.error("Erro ao sincronizar lives:", e);
+    console.error("Erro ao carregar canais:", e);
   }
   renderMyStreams();
 }
@@ -1391,43 +1393,43 @@ async function loadMyStreams() {
 async function addStream() {
   const plat = document.getElementById('add-plat').value;
   const nick = document.getElementById('add-channel').value.trim();
-  
   if (!nick) { toast('Informe o nick do canal!', true); return; }
 
   try {
-    // 1. Atualiza o perfil do usuário (isso evita erros de URL duplicada no cadastro inicial)
+    // 1. Atualiza o perfil do usuário primeiro
     await api('PATCH', '/users/me', { 
       platform: plat, 
       liveNick: nick,
-      channelUrl: `https://${plat}.tv/${nick}`
+      channelUrl: `https://${plat}.tv/${nick}` 
     });
-
+    
     STATE.user.platform = plat;
     STATE.user.liveNick = nick;
     localStorage.setItem('cv_user', JSON.stringify(STATE.user));
 
-    // 2. Tenta criar o registro de streamer. Se já existir (URL em uso), ele apenas ignora o erro e segue.
+    // 2. Tenta registrar como streamer (offline). 
+    // Se der erro de "URL em uso", o catch abaixo apenas ignora e segue em frente.
     try {
       await api('PATCH', '/streamers/me/go-live', { 
         streamTitle: 'Live na Comunidade', 
         game: 'Just Chatting', 
-        liveNick: nick 
+        liveNick: nick,
+        platform: plat
       });
-      // Desativa logo após criar para começar em OFF
       await api('PATCH', '/streamers/me/go-offline');
     } catch (err) {
-      console.log("Canal já registrado no banco, procedendo...");
+      console.warn("Canal já existente no pool, sincronizando...");
     }
 
     await loadMyStreams();
     document.getElementById('add-channel').value = '';
     toast('✅ Canal configurado com sucesso!');
   } catch (e) {
-    // Se ainda der erro de duplicata, avisamos o usuário mas não travamos o site
     if (e.message.includes('uso') || e.message.includes('exists')) {
-       toast('⚠️ Este canal já está registrado. Tente atualizar a página.', true);
+      toast('⚠️ Canal já registrado. Sincronizando dados...', true);
+      await loadMyStreams();
     } else {
-       toast('Erro: ' + e.message, true);
+      toast('Erro ao adicionar: ' + e.message, true);
     }
   }
 }
@@ -1444,31 +1446,35 @@ async function toggleStream(i, el) {
   }
 
   try {
-    const nick = STATE.myStreams[i]?.user?.liveNick || STATE.user?.liveNick || '';
-    const plat = STATE.myStreams[i]?.user?.platform || STATE.user?.platform || 'twitch';
+    const stream = STATE.myStreams[i];
+    const nick = stream?.user?.liveNick || STATE.user?.liveNick;
+    const plat = stream?.user?.platform || STATE.user?.platform;
 
     if (isOn) {
-      // Ativa no servidor com dados completos para aparecer no "Assistir"
+      // Ativa enviando os dados para o pool público
       await api('PATCH', '/streamers/me/go-live', { 
-        streamTitle: 'Live na Comunidade', 
-        game: 'Streams', 
-        liveNick: nick,
-        platform: plat
+        liveNick: nick, 
+        platform: plat,
+        streamTitle: 'Live na Comunidade',
+        game: 'Streams'
       });
+      STATE.isLive = true;
       startDrain();
-      toast('🟢 Live ativada! Você já aparece na lista.');
+      toast('🟢 Live ativada! Você agora aparece para a comunidade.');
     } else {
       await api('PATCH', '/streamers/me/go-offline');
+      STATE.isLive = false;
       stopDrain();
       toast('🔴 Live desativada!');
     }
     
-    // Atualiza o estado local e a interface
+    // Atualiza a lista para confirmar o status do banco
     await loadMyStreams();
   } catch (e) {
+    // Em caso de erro, reverte o botão visualmente
     el.checked = !isOn;
     if (label) label.textContent = el.checked ? 'ON' : 'OFF';
-    toast('Erro ao mudar status: ' + e.message, true);
+    toast('Erro ao mudar status: URL ou Nick já ocupado.', true);
   }
 }
 
@@ -1479,15 +1485,15 @@ function renderMyStreams() {
   if (!rowsEl) return;
 
   if (STATE.myStreams.length === 0) {
-    rowsEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">Nenhum canal cadastrado.</div>`;
+    rowsEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">Nenhum canal cadastrado. Adicione seu canal acima.</div>`;
     return;
   }
 
   rowsEl.innerHTML = STATE.myStreams.map((s, i) => {
-    const isLive = s.isLive;
-    const nick = s.user?.liveNick || u?.liveNick || '—';
     const plat = s.user?.platform || u?.platform || 'twitch';
-
+    const nick = s.user?.liveNick || u?.liveNick || '—';
+    const isLive = s.isLive;
+    
     return `
     <div class="streams-table-row">
       <div class="stream-channel-info">
