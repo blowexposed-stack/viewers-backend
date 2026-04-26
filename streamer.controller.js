@@ -3,24 +3,23 @@
 const Streamer = require('./Streamer'); 
 
 // LISTAR STREAMERS AO VIVO
+// No seu streamer.controller.js
+
 exports.getLiveStreamers = async (req, res) => {
   try {
-    // Busca e ordena por prioridade de plano e número de viewers
     const streamers = await Streamer.find({ isLive: true })
-      .sort({ planPriority: -1, currentViewers: -1 })
-      .populate('user', 'username profileImage') // Traz dados do usuário junto
+      .populate('user', 'username profileImage') // ISSO AQUI É A CHAVE!
+      .sort({ planPriority: -1 })
       .lean();
 
     return res.json({
       success: true,
-      data: streamers || []
+      data: streamers
     });
   } catch (err) {
-    console.error('Erro ao buscar streamers:', err);
-    return res.status(500).json({ success: false, message: 'Erro no servidor' });
+    return res.status(500).json({ success: false });
   }
 };
-
 // MINHA STREAM
 exports.getMyStream = async (req, res) => {
   try {
