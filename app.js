@@ -27,15 +27,12 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false 
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5500')
   .split(',').map(o => o.trim());
 
+// Substitua as linhas 31 até 40 por isso:
 app.use(cors({
-  origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS bloqueado: ${origin}`));
-  },
+  origin: true, // Isso permite que qualquer origem que envie as credenciais seja aceita
   credentials: true,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 const limiter = rateLimit({ windowMs: 15*60*1000, max: 100, standardHeaders: true, legacyHeaders: false });
