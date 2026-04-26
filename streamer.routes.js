@@ -2,28 +2,21 @@
 const express = require('express');
 const router  = express.Router();
 
-// Importe o controller onde você colou a função goLive
-const ctrl    = require('../controllers/streamer.controller'); 
+// MUDANÇA AQUI: Remova o '../' e use apenas './' 
+// Isso diz para o Node procurar o controlador na mesma pasta que as rotas
+const ctrl    = require('./streamer.controller'); 
 
-// Importe os seus middlewares (ajuste o caminho se a pasta for diferente)
-const { authenticate } = require('../middlewares/auth');
-const { paginationRules, validate } = require('../middlewares/validate');
+// Mesma coisa aqui para os outros arquivos:
+const { authenticate } = require('./auth'); 
+const { paginationRules, validate } = require('./validate');
 
-// Definição das Rotas
-// Listar todos os streamers que estão online
 router.get('/', paginationRules, validate, ctrl.getLiveStreamers);
-
-// Pegar os dados do próprio perfil (requer login)
 router.get('/me', authenticate, ctrl.getMyStream);
 
-// Rota que você corrigiu (Ligar Live)
+// Essa é a função que você acabou de me mandar corrigida:
 router.patch('/me/go-live', authenticate, ctrl.goLive);
 
-// Rota para desligar a live
 router.patch('/me/go-offline', authenticate, ctrl.goOffline);
-
-// Rota de tokens/finanças
 router.post('/me/drain', authenticate, ctrl.drainTokens);
 
-// --- ESSA LINHA ABAIXO É A QUE ESTÁ FALTANDO E CAUSA O ERRO NO RAILWAY ---
 module.exports = router;
