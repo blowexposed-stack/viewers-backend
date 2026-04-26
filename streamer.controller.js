@@ -42,10 +42,15 @@ exports.goLive = async (req, res) => {
       return res.status(404).json({ message: 'Streamer não encontrado' });
     }
 
+    // 👇 COLOCA AQUI
+    console.log('ANTES:', streamer.isLive);
+
     streamer.isLive = true;
-    streamer.lastWentLive = new Date();
 
     await streamer.save();
+
+    console.log('DEPOIS:', streamer.isLive);
+    // 👆 ATÉ AQUI
 
     return res.json({
       success: true,
@@ -58,7 +63,6 @@ exports.goLive = async (req, res) => {
     return res.status(500).json({ success: false });
   }
 };
-
 // GO OFFLINE
 exports.goOffline = async (req, res) => {
   try {
