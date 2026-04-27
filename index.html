@@ -1075,6 +1075,11 @@ function connectSocket() {
 // ════════════════════════════════════════════════════════════
 //  LIVES — carrega da API
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  CONTROLE DE ABAS E SEGURANÇA (Substitua a partir daqui)
+// ════════════════════════════════════════════════════════════
+let abasAbertas = []; 
+
 async function loadLives() {
   const grid = document.getElementById('lives-grid');
   try {
@@ -1104,6 +1109,7 @@ async function loadLives() {
     const platEmoji = { twitch:'💜', youtube:'🔴', kick:'🟢', facebook:'🔵' };
     const platUrl   = { twitch:'https://twitch.tv/', youtube:'https://youtube.com/@', kick:'https://kick.com/', facebook:'https://facebook.com/' };
     const tk = getSessionTokens();
+    
     grid.innerHTML = lives.map((s, i) => {
       const plat = s.user?.platform || 'twitch';
       const nick = s.user?.liveNick || s.user?.nickname || 'canal';
@@ -1134,23 +1140,19 @@ function openStreamTab(url) {
   window.open(url, '_blank');
 }
 
-// ════════════════════════════════════════════════════════════
-//  ASSISTIR — SESSÃO COM 3 ABAS REAIS
-// ════════════════════════════════════════════════════════════
 async function checkAvailableLives() {
   await loadLives();
   const msgEl = document.getElementById('watch-avail-msg');
   const btnEl = document.getElementById('btn-start-watch');
   if (SESSION.livePool.length === 0) {
-    msgEl.innerHTML = '<span style="color:var(--red)">⚠️ Nenhuma live ativa no momento. Volte mais tarde ou convide outros streamers!</span>';
+    msgEl.innerHTML = '<span style="color:var(--red)">⚠️ Nenhuma live ativa no momento. Volte mais tarde!</span>';
     btnEl.disabled = true;
     btnEl.style.opacity = '.5';
   } else {
-    // Aviso se sem tokens
     if (STATE.tokens < 2) {
-      msgEl.innerHTML = '<span style="color:var(--gold)">💡 Você pode ganhar tokens assistindo as lives abaixo! Clique em "Assistir agora" para começar.</span>';
+      msgEl.innerHTML = '<span style="color:var(--gold)">💡 Clique em "Assistir agora" para começar a ganhar tokens.</span>';
     }
-    msgEl.textContent = SESSION.livePool.length + ' live(s) disponível(is) para assistir';
+    msgEl.textContent = SESSION.livePool.length + ' live(s) disponível(is)';
     btnEl.disabled = false;
     btnEl.style.opacity = '1';
   }
@@ -1158,10 +1160,9 @@ async function checkAvailableLives() {
 
 const PLAT_URL = { twitch:'https://twitch.tv/', youtube:'https://youtube.com/@', kick:'https://kick.com/', facebook:'https://facebook.com/' };
 
-// Pega N streamers DIFERENTES do pool (nunca repete na mesma rodada)
 function pickUnique(pool, count, exclude = []) {
   const available = pool.filter(s => !exclude.includes(s.nick));
-  const source    = available.length >= count ? available : pool; // fallback se pool pequeno
+  const source    = available.length >= count ? available : pool;
   const result    = [];
   const used      = new Set(exclude);
   const shuffled  = [...source].sort(() => Math.random() - 0.5);
@@ -1177,44 +1178,50 @@ async function startSession() {
 
   await loadLives();
   if (SESSION.livePool.length === 0) {
-    toast('Nenhuma live disponível agora. Ative sua live ou convide outros!', true);
+    toast('Nenhuma live disponível agora.', true);
     return;
   }
 
-  // Pega até 3 streamers diferentes (plataformas variadas se possível)
   const picked = pickUnique(SESSION.livePool, 3);
+  abasAbertas = []; 
 
-  // Abre 1 aba por streamer — todas diferentes
-  picked.forEach(s => {
+  picked.forEach((s, i) => {
     const url = (PLAT_URL[s.platform] || 'https://twitch.tv/') + s.nick;
-    window.open(url, '_blank');
+    abasAbertas[i] = window.open(url, '_blank');
   });
 
-  // Preenche slots vazios com placeholder se tiver menos de 3 streamers
   while (picked.length < 3) {
     picked.push({ nick:'—', nickname:'Aguardando...', platform:'twitch', empty:true });
   }
 
-  SESSION.active        = true;
-  SESSION.slots         = picked.map(s => ({ ...s, secsLeft: s.empty ? 0 : SESSION_SECS, earned:false, rotating:false, readyToRotate:false, done:false }));
+  SESSION.active = true;
+  SESSION.slots = picked.map(s => ({ ...s, secsLeft: s.empty ? 0 : SESSION_SECS, earned:false, rotating:false, readyToRotate:false, done:false }));
   SESSION.sessionTokens = 0;
-  SESSION.cycleTokensDeducted = false;
 
   document.getElementById('watch-session').classList.add('active');
   document.getElementById('watch-start-area').style.display = 'none';
   renderSlots();
 
   SESSION.masterInterval = setInterval(sessionTick, 1000);
-  toast('▶ ' + picked.filter(s=>!s.empty).length + ' aba(s) abertas! Assistindo ' + picked.filter(s=>!s.empty).map(s=>s.nickname).join(', '));
+  toast('▶ Abas abertas! Mantenha-as abertas para ganhar tokens.');
 }
 
 function sessionTick() {
   SESSION.slots.forEach((slot, i) => {
-    if (slot.rotating || slot.done) return; // já está rotacionando ou finalizado
+    if (slot.rotating || slot.done || slot.empty) return;
+
+    if (abasAbertas[i] && abasAbertas[i].closed) {
+        slot.done = true;
+        slot.secsLeft = 0;
+        toast('⚠️ Aba ' + (i+1) + ' fechada! Você não ganhou tokens deste slot.', true);
+        rotateSlot(i, false); 
+        return;
+    }
+
     slot.secsLeft--;
     if (slot.secsLeft <= 0) {
-      slot.done = true; // marca como finalizado para não chamar de novo
-      rotateSlot(i);
+      slot.done = true;
+      rotateSlot(i, true); 
     } else {
       updateSlotTimer(i);
     }
@@ -1222,35 +1229,7 @@ function sessionTick() {
   updateSessionHeader();
 }
 
-
-// ─── Drain: desconta tokens da live ativa a cada 60s ─────────────────────────
-let drainInterval = null;
-
-function startDrain() {
-  stopDrain();
-  drainInterval = setInterval(async () => {
-    if (!STATE.user) return;
-    try {
-      const data = await api('POST', '/streamers/me/drain', { tabs: 3 });
-      if (!data.success && data.liveDowned) {
-        // Live derrubada por saldo insuficiente
-        const rowsEl = document.getElementById('my-streams-rows');
-        if (rowsEl) loadMyStreams();
-        toast('⚠️ Saldo insuficiente! Sua live foi desativada. Assista outras lives para ganhar tokens.', true);
-        stopDrain();
-      } else if (data.newBalance !== undefined) {
-        STATE.tokens = data.newBalance;
-        updateUI();
-      }
-    } catch {}
-  }, 60000); // a cada 60s
-}
-
-function stopDrain() {
-  if (drainInterval) { clearInterval(drainInterval); drainInterval = null; }
-}
-
-async function rotateSlot(i) {
+async function rotateSlot(i, ganhouToken = true) {
   const slot = SESSION.slots[i];
   if (!slot || slot.rotating) return;
 
@@ -1258,39 +1237,24 @@ async function rotateSlot(i) {
   slot.readyToRotate = true;
   renderSlotRotating(i);
 
-  // ── Crédito de tokens: cada slot credita individualmente ao terminar ───────
-  // (não espera os 3 — cada aba de 10 min vale tokens)
-  const earned = getSessionTokens();  // 2 / 2.5 / 3.5 / 6 conforme plano
-  SESSION.sessionTokens += earned;
-  SESSION.totalMinutes  += 10;
-  STATE.tokens           = Math.max(0, STATE.tokens + earned);
-  STATE.minutes          = (STATE.minutes || 0) + 10;
+  if (ganhouToken && !slot.empty) {
+    const earned = getSessionTokens();
+    SESSION.sessionTokens += earned;
+    SESSION.totalMinutes  += 10;
+    STATE.tokens           = Math.max(0, STATE.tokens + earned);
+    STATE.minutes          = (STATE.minutes || 0) + 10;
 
-  showTokenFloat('+' + earned + ' 🪙');
-
-  setText('ws-tok',  SESSION.sessionTokens.toFixed(1));
-  setText('ws-min',  SESSION.totalMinutes);
-  setText('sb-tokens', Math.floor(STATE.tokens));
-  setText('inv-tokens', Math.floor(STATE.tokens));
-  setText('inv-minutes', STATE.minutes);
-
-  // Se TODOS os 3 terminaram ao mesmo tempo → incrementa sessão completa
-  const allReady = SESSION.slots.every(s => s.rotating && s.readyToRotate);
-  if (allReady) {
-    SESSION.totalSessions++;
-    setText('ws-sess', SESSION.totalSessions);
+    showTokenFloat('+' + earned + ' 🪙');
+    updateSessionHeader();
+    
+    api('POST', '/tokens/earn')
+      .then(d => { if (d?.newBalance !== undefined) { STATE.tokens = d.newBalance; updateUI(); } })
+      .catch(() => {});
   }
 
-  // Credita via API (async)
-  api('POST', '/tokens/earn')
-    .then(d => { if (d?.newBalance !== undefined) { STATE.tokens = d.newBalance; updateUI(); } })
-    .catch(() => {});
-
-  // ── Aguarda 3s de transição ────────────────────────────────────────────────
   await sleep(3000);
   await loadLives();
 
-  // ── Escolhe próximo streamer DIFERENTE dos que estão nas outras abas ───────
   const activeNicks = SESSION.slots
     .filter((s, idx) => idx !== i && !s.rotating)
     .map(s => s.nick)
@@ -1299,17 +1263,14 @@ async function rotateSlot(i) {
   const nextList = pickUnique(SESSION.livePool, 1, activeNicks);
 
   if (!nextList.length) {
-    // Sem lives disponíveis para este slot
-    SESSION.slots[i] = { nick:'—', nickname:'Aguardando live...', platform:'twitch', secsLeft:0, rotating:false, readyToRotate:false, empty:true, done:true };
+    SESSION.slots[i] = { nick:'—', nickname:'Sem lives...', platform:'twitch', secsLeft:0, rotating:false, readyToRotate:false, empty:true, done:true };
     renderSlotEmpty(i);
     updateUI();
     return;
   }
 
   const next = nextList[0];
-
-  // Abre nova aba no navegador — streamer diferente das outras abas
-  window.open((PLAT_URL[next.platform] || 'https://twitch.tv/') + next.nick, '_blank');
+  abasAbertas[i] = window.open((PLAT_URL[next.platform] || 'https://twitch.tv/') + next.nick, '_blank');
 
   SESSION.slots[i] = {
     ...next,
@@ -1318,7 +1279,7 @@ async function rotateSlot(i) {
     rotating:      false,
     readyToRotate: false,
     empty:         false,
-    done:          false,  // reseta flag para novo timer
+    done:          false,
   };
   renderSlot(i);
   updateUI();
@@ -1327,10 +1288,12 @@ async function rotateSlot(i) {
 function stopSession() {
   SESSION.active = false;
   clearInterval(SESSION.masterInterval);
+  abasAbertas.forEach(a => { if(a && !a.closed) a.close(); });
+  
   document.getElementById('watch-session').classList.remove('active');
   document.getElementById('watch-start-area').style.display = '';
   if (SESSION.sessionTokens > 0) {
-    toast('✅ Sessão encerrada! +' + SESSION.sessionTokens.toFixed(1) + ' tokens ganhos!');
+    toast('✅ Sessão encerrada! +' + SESSION.sessionTokens.toFixed(1) + ' tokens!');
   }
   checkAvailableLives();
   updateUI();
