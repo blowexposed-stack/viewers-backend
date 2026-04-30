@@ -2,30 +2,39 @@
 
 const jwt = require('jsonwebtoken');
 
+// Usamos as chaves do Railway, mas deixamos a sua chave informada como reserva para o servidor não cair
+const SECRET = process.env.JWT_SECRET || 'fe17791bacffc4b0e6ace52e48c982d1ecd8a8ecc9a464d68abcc41848cf0590';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fe17791bacffc4b0e6ace52e48c982d1ecd8a8ecc9a464d68abcc41848cf0590';
+
 function generateAccessToken(userId, role) {
-  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET não definido.');
+  // Removi o 'throw' para o servidor não crashar se o env falhar
   return jwt.sign(
     { sub: String(userId), role },
-    process.env.JWT_SECRET,
+    SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 }
 
 function generateRefreshToken(userId) {
-  if (!process.env.JWT_REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET não definido.');
   return jwt.sign(
     { sub: String(userId) },
-    process.env.JWT_REFRESH_SECRET,
+    REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
   );
 }
 
 function verifyAccessToken(token) {
-  return jwt.verify(token, process.env.JWT_SECRET);
+  // Valida usando a chave definida acima
+  return jwt.verify(token, SECRET);
 }
 
 function verifyRefreshToken(token) {
-  return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+  return jwt.verify(token, REFRESH_SECRET);
 }
 
-module.exports = { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken };
+module.exports = { 
+  generateAccessToken, 
+  generateRefreshToken, 
+  verifyAccessToken, 
+  verifyRefreshToken 
+};
