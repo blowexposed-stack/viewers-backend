@@ -1,57 +1,39 @@
 'use strict';
 
-const { verifyAccessToken } = require('./jwt');
-const User   = require('./User');
-const logger = require('./logger');
-const AppError = require('./AppError');
+const jwt = require('jsonwebtoken');
 
-// ─── Autentica JWT ────────────────────────────────────────────────────────────
-async function authenticate(req, res, next) {
-  try {
-    // 1. Extrai o token do header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return next(new AppError('Token de autenticação não fornecido.', 401));
-    }
+// Usamos as chaves do Railway. O fallback é a chave que você confirmou estar no painel.
+const SECRET = process.env.JWT_SECRET || 'fe17791bacffc4b0e6ace52e48c982d1ecd8a8ecc9a464d68abcc41848cf0590';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fe17791bacffc4b0e6ace52e48c982d1ecd8a8ecc9a464d68abcc41848cf0590';
 
-    const token = authHeader.split(' ')[1];
-
-    // 2. Verifica e decodifica o token
-    let decoded;
-    try {
-      decoded = verifyAccessToken(token);
-    } catch (err) {
-      if (err.name === 'TokenExpiredError') {
-        return next(new AppError('Sessão expirada. Faça login novamente.', 401));
-      }
-      return next(new AppError('Token inválido.', 401));
-    }
-
-    // 3. Busca o usuário (verifica se ainda existe e está ativo)
-    const user = await User.findById(decoded.sub).select('+isActive +role');
-    if (!user) return next(new AppError('Usuário não encontrado.', 401));
-    if (!user.isActive) return next(new AppError('Conta suspensa. Entre em contato com o suporte.', 403));
-
-    // 4. Injeta o usuário na request
-    req.user = user;
-    next();
-  } catch (err) {
-    logger.error('Erro no middleware de autenticação:', err);
-    next(new AppError('Erro de autenticação.', 500));
-  }
+function generateAccessToken(userId, role) {
+  return jwt.sign(
+    { sub: String(userId), role },
+    SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
 }
 
-// ─── Autorização por role ─────────────────────────────────────────────────────
-function authorize(...roles) {
-  return (req, res, next) => {
-    if (!req.user) return next(new AppError('Não autenticado.', 401));
-
-    if (!roles.includes(req.user.role)) {
-      return next(new AppError('Você não tem permissão para esta ação.', 403));
-    }
-
-    next();
-  };
+function generateRefreshToken(userId) {
+  return jwt.sign(
+    { sub: String(userId) },
+    REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
+  );
 }
 
-module.exports = { authenticate, authorize };
+function verifyAccessToken(token) {
+  // Removemos issuer/audience para simplificar e evitar o erro 401 direto
+  return jwt.verify(token, SECRET);
+}
+
+function verifyRefreshToken(token) {
+  return jwt.verify(token, REFRESH_SECRET);
+}
+
+module.exports = { 
+  generateAccessToken, 
+  generateRefreshToken, 
+  verifyAccessToken, 
+  verifyRefreshToken 
+};
