@@ -1,7 +1,6 @@
 'use strict';
 
 const router = require('express').Router();
-// Importando as funções separadamente para garantir que elas existem
 const { 
   register, 
   login, 
@@ -14,15 +13,21 @@ const {
 const { authenticate } = require('./auth');
 const { validate, registerRules, loginRules } = require('./validate');
 
-// Se alguma das funções acima for 'undefined', o Node vai avisar aqui embaixo
-console.log("Check de funções:", { register: !!register, login: !!login });
+// Verificação completa no log para sabermos exatamente qual falhou
+console.log("Status das funções:", { 
+  register: !!register, 
+  login: !!login, 
+  refresh: !!refresh, 
+  forgotPassword: !!forgotPassword, 
+  logout: !!logout 
+});
 
-// Linha 23 (ajuste as rotas para usarem os nomes diretos das funções)
-router.post('/register', registerRules, validate, register);
-router.post('/login', loginRules, validate, login);
-router.post('/refresh', refresh);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password/:token', resetPassword);
-router.post('/logout', authenticate, logout);
+// Usando condicionais para evitar que o servidor quebre se uma função faltar
+if (register) router.post('/register', registerRules, validate, register);
+if (login)    router.post('/login', loginRules, validate, login);
+if (refresh)  router.post('/refresh', refresh);
+if (forgotPassword) router.post('/forgot-password', forgotPassword);
+if (resetPassword)  router.post('/reset-password/:token', resetPassword);
+if (logout)   router.post('/logout', authenticate, logout);
 
 module.exports = router;
