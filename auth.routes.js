@@ -1,33 +1,29 @@
 'use strict';
 
 const router = require('express').Router();
-const { 
-  register, 
-  login, 
-  refresh, 
-  forgotPassword, 
-  resetPassword, 
-  logout 
-} = require('./auth.controller');
+// Importa o controller inteiro como um objeto
+const authCtrl = require('./auth.controller');
 
 const { authenticate } = require('./auth');
 const { validate, registerRules, loginRules } = require('./validate');
 
-// Verificação completa no log para sabermos exatamente qual falhou
-console.log("Status das funções:", { 
-  register: !!register, 
-  login: !!login, 
-  refresh: !!refresh, 
-  forgotPassword: !!forgotPassword, 
-  logout: !!logout 
-});
+// Função auxiliar para evitar o erro de 'Undefined'
+const handle = (methodName) => {
+    return (req, res, next) => {
+        if (authCtrl && typeof authCtrl[methodName] === 'function') {
+            return authCtrl[methodName](req, res, next);
+        }
+        console.error(`ERRO: A função ${methodName} não foi encontrada no controller.`);
+        res.status(501).json({ error: `Rota ${methodName} não implementada no servidor.` });
+    };
+};
 
-// Usando condicionais para evitar que o servidor quebre se uma função faltar
-if (register) router.post('/register', registerRules, validate, register);
-if (login)    router.post('/login', loginRules, validate, login);
-if (refresh)  router.post('/refresh', refresh);
-if (forgotPassword) router.post('/forgot-password', forgotPassword);
-if (resetPassword)  router.post('/reset-password/:token', resetPassword);
-if (logout)   router.post('/logout', authenticate, logout);
+// Agora as rotas NUNCA mais vão dar erro de 'callback function undefined'
+router.post('/register', registerRules, validate, handle('register'));
+router.post('/login',    loginRules,    validate, handle('login'));
+router.post('/refresh',                           handle('refresh'));
+router.post('/forgot-password',                   handle('forgotPassword'));
+router.post('/reset-password/:token',             handle('resetPassword'));
+router.post('/logout',           authenticate,    handle('logout'));
 
 module.exports = router;
