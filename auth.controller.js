@@ -169,4 +169,11 @@ const authController = {
   }
 };
 
-module.exports = authController;
+module.exports = {
+  register: authController.register,
+  login: authController.login,
+  refresh: authController.refresh,
+  logout: authController.logout,
+  forgotPassword: authController.forgotPassword,
+  resetPassword: authController.resetPassword
+};
