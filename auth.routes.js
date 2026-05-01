@@ -5,28 +5,17 @@ const ctrl = require('./auth.controller');
 const { authenticate } = require('./auth');
 const { validate, registerRules, loginRules } = require('./validate');
 
-// Função "Wrapper" - Ela impede o Express de receber um 'undefined' no boot
-const wrap = (methodName) => {
-  return (req, res, next) => {
-    if (ctrl && typeof ctrl[methodName] === 'function') {
-      return ctrl[methodName](req, res, next);
-    }
-    console.error(`❌ Erro Crítico: O método '${methodName}' não foi encontrado no auth.controller.js`);
-    return res.status(500).json({ 
-      success: false, 
-      message: `Erro interno: função ${methodName} não carregada.` 
-    });
-  };
-};
+// Se ctrl estiver vindo vazio por erro de path, isso aqui mata o erro antes do Express
+if (!ctrl) {
+  console.error("❌ CRÍTICO: O arquivo auth.controller.js não foi carregado!");
+}
 
-// --- ROTAS PÚBLICAS ---
-router.post('/register', registerRules, validate, wrap('register'));
-router.post('/login', loginRules, validate, wrap('login'));
-router.post('/refresh', wrap('refresh'));
-router.post('/forgot-password', wrap('forgotPassword'));
-router.post('/reset-password/:token', wrap('resetPassword'));
-
-// --- ROTAS AUTENTICADAS ---
-router.post('/logout', authenticate, wrap('logout'));
+// Criamos funções anônimas para que o Express nunca receba 'undefined' no boot
+router.post('/register', registerRules, validate, (req, res, next) => ctrl.register(req, res, next));
+router.post('/login', loginRules, validate, (req, res, next) => ctrl.login(req, res, next));
+router.post('/refresh', (req, res, next) => ctrl.refresh(req, res, next));
+router.post('/forgot-password', (req, res, next) => ctrl.forgotPassword(req, res, next));
+router.post('/reset-password/:token', (req, res, next) => ctrl.resetPassword(req, res, next));
+router.post('/logout', authenticate, (req, res, next) => ctrl.logout(req, res, next));
 
 module.exports = router;
