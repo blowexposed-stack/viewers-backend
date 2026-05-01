@@ -1,100 +1,58 @@
 'use strict';
 
-// Carrega variáveis de ambiente logo no início
 require('dotenv').config();
-
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
 const connectDB = require('./database');
-const logger = require('./logger');
 
-// Configuração de Porta para Railway (0.0.0.0 é essencial)
+// O Render injeta a porta automaticamente. Se não houver, usamos 3000.
 const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0'; 
 
 async function startServer() {
+  const server = http.createServer(app);
+
+  // Configuração do Socket.io
+  const io = new Server(server, {
+    cors: {
+      origin: "*", // Temporariamente "*" para testar se o erro é o CORS
+      methods: ["GET", "POST"]
+    }
+  });
+
+  app.set('io', io);
+  global._io = io;
+
+  // Tenta conectar ao banco, mas NÃO deixa o servidor cair se falhar
   try {
-    // 1. Conexão com o Banco de Dados (MongoDB)
     await connectDB();
-    logger.info('Banco de dados conectado com sucesso.');
-
-    // 2. Criação do servidor HTTP a partir do App Express
-    const server = http.createServer(app);
-
-    // 3. Configuração Robusta do Socket.io
-    // Adicionado suporte a múltiplos domínios e tratamento de erro de CORS
-    const io = new Server(server, {
-      cors: {
-        origin: [
-          "https://comunidadeviewers.vercel.app", 
-          "http://localhost:3000",
-          "http://localhost:5173" // Padrão do Vite (Front-end comum)
-        ],
-        methods: ["GET", "POST"],
-        credentials: true
-      },
-      pingTimeout: 60000, // Evita desconexões em redes instáveis
-    });
-
-    /**
-     * INJEÇÃO DE DEPENDÊNCIA (SOCKET.IO)
-     * Disponibiliza o IO para os Controllers sem causar dependência circular.
-     */
-    app.set('io', io);           // Acessível via req.app.get('io')
-    global._io = io;             // Acessível globalmente (usado no Payment Controller)
-    
-    // 4. Gerenciamento de Eventos Socket
-    io.on('connection', (socket) => {
-      logger.info(`Conectado: ${socket.id}`);
-
-      // Canal para entrar em salas específicas (ex: sala do streamer)
-      socket.on('join-room', (roomId) => {
-        socket.join(roomId);
-        logger.info(`Socket ${socket.id} entrou na sala: ${roomId}`);
-      });
-
-      socket.on('disconnect', (reason) => {
-        logger.info(`Desconectado: ${socket.id} - Motivo: ${reason}`);
-      });
-    });
-
-    // 5. Inicialização do Servidor
-    server.listen(PORT, HOST, () => {
-      const mode = process.env.NODE_ENV || 'development';
-      logger.info(`🚀 Servidor Ativo!`);
-      logger.info(`📍 Porta: ${PORT}`);
-      logger.info(`🛠️ Modo: ${mode}`);
-      logger.info(`🔗 Socket.io pronto para receber conexões.`);
-    });
-
-    // 6. Graceful Shutdown (Desligamento suave)
-    // Essencial para o Railway não deixar processos "zumbis"
-    const gracefulShutdown = () => {
-      logger.info('Iniciando encerramento do servidor...');
-      server.close(() => {
-        logger.info('Servidor HTTP encerrado.');
-        process.exit(0);
-      });
-    };
-
-    process.on('SIGTERM', gracefulShutdown);
-    process.on('SIGINT', gracefulShutdown);
-
+    console.log('✅ MongoDB Conectado');
   } catch (err) {
-    logger.error('❌ Falha crítica ao iniciar o servidor:', err);
-    process.exit(1);
+    console.error('❌ Erro ao conectar ao MongoDB:', err.message);
+    // Não damos process.exit(1) aqui para o Render ver que o app subiu
   }
+
+  // Escuta na porta e no host 0.0.0.0 (Obrigatório para nuvem)
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor Online na porta ${PORT}`);
+    console.log(`🔗 URL: https://viewers-backend.onrender.com (ou a sua do Render)`);
+  });
+
+  // Tratamento de erros dentro do Socket
+  io.on('error', (err) => {
+    console.error('Erro no Socket.io:', err);
+  });
 }
 
-// 7. Tratamento de Erros Globais (Previne o Crash definitivo)
+// CAPTURA DE ERROS CRÍTICOS - Isso impede o Status 1 sem explicação
 process.on('uncaughtException', (err) => {
-  logger.error('⚠️ Exceção não capturada:', err);
-  // Se for erro de conexão do banco, o ideal é tentar reconectar ou fechar
+  console.error('🔥 ERRO CRÍTICO (Uncaught Exception):', err.stack);
+  // Mantemos o processo vivo por 5 segundos para o log aparecer no Render
+  setTimeout(() => process.exit(1), 5000);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('⚠️ Promessa não tratada em:', promise, 'razão:', reason);
+  console.error('⚠️ Promessa não tratada em:', promise, 'razão:', reason);
 });
 
 startServer();
