@@ -3,8 +3,8 @@
 const jwt = require('jsonwebtoken');
 
 // ESTRATÉGIA DE SEGURANÇA: Nunca use a mesma Secret para os dois tokens
-const ACCESS_SECRET = process.env.JWT_SECRET || 'sua_chave_acesso_ultra_secreta';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'sua_chave_refresh_mais_secreta_ainda';
+const ACCESS_SECRET = process.env.JWT_SECRET || 'fe17791bacffc4b0e6ace52e48c982d1ecd8a8ecc9a464d68abcc41848cf0590';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'e8ee7bf553427bc9d7423eba7e99ea728959afb895f47b6662a5ce4344cdd350';
 
 /**
  * Gera Token de Acesso (Curta duração)
