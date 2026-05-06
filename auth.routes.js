@@ -1,29 +1,43 @@
 'use strict';
 
 const router = require('express').Router();
-// Importa o controller inteiro como um objeto
+// Importamos apenas o que vamos usar, garantindo clareza
 const authCtrl = require('./auth.controller');
 
 const { authenticate } = require('./auth');
 const { validate, registerRules, loginRules } = require('./validate');
 
-// Função auxiliar para evitar o erro de 'Undefined'
-const handle = (methodName) => {
+/**
+ * Se você prefere manter a segurança contra 'undefined', 
+ * esta versão simplificada do seu handle resolve sem poluir as rotas.
+ */
+const safe = (method) => {
     return (req, res, next) => {
-        if (authCtrl && typeof authCtrl[methodName] === 'function') {
-            return authCtrl[methodName](req, res, next);
-        }
-        console.error(`ERRO: A função ${methodName} não foi encontrada no controller.`);
-        res.status(501).json({ error: `Rota ${methodName} não implementada no servidor.` });
+        if (authCtrl[method]) return authCtrl[method](req, res, next);
+        
+        console.error(`[ERRO CRÍTICO]: Método ${method} não encontrado no auth.controller.`);
+        res.status(501).json({ error: 'Funcionalidade temporariamente indisponível.' });
     };
 };
 
-// Agora as rotas NUNCA mais vão dar erro de 'callback function undefined'
-router.post('/register', registerRules, validate, handle('register'));
-router.post('/login',    loginRules,    validate, handle('login'));
-router.post('/refresh',                           handle('refresh'));
-router.post('/forgot-password',                   handle('forgotPassword'));
-router.post('/reset-password/:token',             handle('resetPassword'));
-router.post('/logout',           authenticate,    handle('logout'));
+// --- ROTAS PÚBLICAS ---
+
+// Registro de novo usuário
+router.post('/register', registerRules, validate, safe('register'));
+
+// Login e obtenção de tokens
+router.post('/login', loginRules, validate, safe('login'));
+
+// Renovação de token (Refresh Token)
+router.post('/refresh', safe('refresh'));
+
+// Recuperação de senha
+router.post('/forgot-password', safe('forgotPassword'));
+router.post('/reset-password/:token', safe('resetPassword'));
+
+// --- ROTAS PROTEGIDAS ---
+
+// Logout (Requer autenticação)
+router.post('/logout', authenticate, safe('logout'));
 
 module.exports = router;
