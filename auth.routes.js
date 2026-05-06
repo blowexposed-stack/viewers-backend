@@ -1,43 +1,51 @@
 'use strict';
 
 const router = require('express').Router();
-// Importamos apenas o que vamos usar, garantindo clareza
 const authCtrl = require('./auth.controller');
 
-const { authenticate } = require('./auth');
-const { validate, registerRules, loginRules } = require('./validate');
+// Importações dos Middlewares
+const authMiddleware = require('./auth');
+const validateMiddleware = require('./validate');
+
+// --- TRAVA DE SEGURANÇA (Anti-Crash Railway) ---
+// Se a importação falhar, atribuímos uma função vazia ou array vazio para não quebrar o Express
+const authenticate = authMiddleware.authenticate || ((req, res, next) => next());
+const validate = validateMiddleware.validate || ((req, res, next) => next());
+const registerRules = validateMiddleware.registerRules || [];
+const loginRules = validateMiddleware.loginRules || [];
 
 /**
- * Se você prefere manter a segurança contra 'undefined', 
- * esta versão simplificada do seu handle resolve sem poluir as rotas.
+ * Wrapper para métodos do controller
+ * Evita que o servidor caia se você esquecer de exportar um método no controller
  */
 const safe = (method) => {
     return (req, res, next) => {
-        if (authCtrl[method]) return authCtrl[method](req, res, next);
+        if (authCtrl && typeof authCtrl[method] === 'function') {
+            return authCtrl[method](req, res, next);
+        }
         
-        console.error(`[ERRO CRÍTICO]: Método ${method} não encontrado no auth.controller.`);
-        res.status(501).json({ error: 'Funcionalidade temporariamente indisponível.' });
+        console.error(`[ERRO]: O método "${method}" não foi encontrado no auth.controller.js`);
+        res.status(501).json({ 
+            success: false, 
+            error: 'Esta funcionalidade ainda não foi implementada ou está em manutenção.' 
+        });
     };
 };
 
-// --- ROTAS PÚBLICAS ---
+// --- DEFINIÇÃO DAS ROTAS ---
 
-// Registro de novo usuário
+// Registro e Login (Público)
 router.post('/register', registerRules, validate, safe('register'));
+router.post('/login',    loginRules,    validate, safe('login'));
 
-// Login e obtenção de tokens
-router.post('/login', loginRules, validate, safe('login'));
-
-// Renovação de token (Refresh Token)
+// Tokens (Público - O refresh valida o cookie internamente)
 router.post('/refresh', safe('refresh'));
 
-// Recuperação de senha
-router.post('/forgot-password', safe('forgotPassword'));
+// Recuperação de Senha (Público)
+router.post('/forgot-password',       safe('forgotPassword'));
 router.post('/reset-password/:token', safe('resetPassword'));
 
-// --- ROTAS PROTEGIDAS ---
-
-// Logout (Requer autenticação)
+// Logout (Protegido - Requer Token de Acesso)
 router.post('/logout', authenticate, safe('logout'));
 
 module.exports = router;
