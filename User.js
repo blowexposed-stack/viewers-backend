@@ -9,13 +9,21 @@ const PLANS = ['none', 'starter', 'pro', 'elite'];
 
 const userSchema = new mongoose.Schema({
   nickname: {
-    type: String, required: [true, 'Nickname obrigatório.'], unique: true,
-    trim: true, minlength: 3, maxlength: 30, index: true,
+    type: String, 
+    required: [true, 'Nickname obrigatório.'], 
+    unique: true, // Unique já cria o índice automaticamente
+    trim: true, 
+    minlength: 3, 
+    maxlength: 30,
     match: [/^[a-zA-Z0-9_]+$/, 'Apenas letras, números e _.']
   },
   email: {
-    type: String, required: [true, 'E-mail obrigatório.'], unique: true,
-    lowercase: true, trim: true, index: true, match: [/^\S+@\S+\.\S+$/, 'E-mail inválido.']
+    type: String, 
+    required: [true, 'E-mail obrigatório.'], 
+    unique: true, // Unique já cria o índice automaticamente
+    lowercase: true, 
+    trim: true, 
+    match: [/^\S+@\S+\.\S+$/, 'E-mail inválido.']
   },
   password: { type: String, required: [true, 'Senha obrigatória.'], minlength: 8, select: false },
   role: { type: String, enum: ROLES, default: 'user', index: true },
@@ -52,6 +60,7 @@ const userSchema = new mongoose.Schema({
   }
 });
 
+// Índice composto otimizado para o sistema de tokens e planos
 userSchema.index({ activePlan: 1, tokens: -1 });
 
 userSchema.virtual('isLocked').get(function() {
@@ -89,10 +98,5 @@ userSchema.methods.incrementLoginAttempts = function() {
 userSchema.methods.resetLoginAttempts = function() {
   return this.updateOne({ $set: { loginAttempts: 0 }, $unset: { lockUntil: 1 } });
 };
-
-// Conexão de segurança para o Railway
-if (mongoose.connection.readyState === 0) {
-  mongoose.connect(process.env.MONGODB_URI);
-}
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);
