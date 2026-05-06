@@ -59,11 +59,19 @@ const authenticate = (req, res, next) => {
   }
 };
 
-// EXPORTAÇÃO COMPLETA: Garante que o auth.routes.js encontre tudo
+// No final do seu arquivo de autenticação (ex: auth.js ou jwt.js)
+
 module.exports = { 
+  // Funções de criação e verificação de Tokens
   generateAccessToken, 
   generateRefreshToken, 
   verifyAccessToken, 
   verifyRefreshToken,
-  authenticate // <--- Isso resolve o seu crash no Railway
+
+  // Middleware de Autenticação (Verifica se o usuário está logado)
+  authenticate, 
+
+  // Middleware de Autorização (Verifica se o usuário é admin/mod)
+  // Certifique-se de que a função 'authorize' está definida acima no arquivo!
+  authorize 
 };
