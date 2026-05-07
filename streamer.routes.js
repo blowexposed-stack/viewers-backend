@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const streamerController = require('./streamer.controller');
-const { protect } = require('./auth.middleware');
+const { authenticate } = require('./auth');
 
 /**
  * ROTAS PÚBLICAS
@@ -16,7 +16,7 @@ router.get('/', streamerController.getLiveStreamers);
  * Todas as rotas abaixo desta linha exigem que o usuário esteja logado.
  * Isso evita que você precise colocar 'protect' em cada linha individualmente.
  */
-router.use(protect);
+router.use(authenticate);
 
 /**
  * ROTAS PRIVADAS (Requerem Autenticação)
