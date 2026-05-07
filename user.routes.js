@@ -4,31 +4,43 @@ const express = require('express');
 const router = express.Router();
 const streamerController = require('./streamer.controller');
 
-// Importação mais segura do middleware
-const authMiddleware = require('./auth');
+// Importando os middlewares que você definiu no auth.js
+const { authenticate, authorize } = require('./auth');
 
-// Verifica se 'protect' existe dentro do arquivo importado, 
-// senão tenta usar o arquivo importado diretamente como a função de proteção.
-const { authenticate, authorize } = require('./auth'); // Importando como objeto
-
-// Exemplo de uso na linha 12 e além
-r.use(authenticate); 
-
-// Se quiser proteger uma rota apenas para admins:
-r.delete('/usuario/:id', authorize('admin'), controller.deleteUser);
-// Uso direto:
-router.get('/perfil', protect, getUserProfile);
-
-// 1. Rota Pública
+/**
+ * ROTAS PÚBLICAS
+ * (Acessíveis sem login)
+ */
 router.get('/', streamerController.getLiveStreamers);
 
-// 2. Middleware de Proteção aplicado a todas as rotas abaixo
-// Se 'protect' for undefined aqui, o Express dará o erro que você viu.
-router.use(protect);
+/**
+ * MIDDLEWARE DE AUTENTICAÇÃO
+ * A partir desta linha, todas as rotas abaixo exigem um token válido
+ */
+router.use(authenticate); 
 
-// 3. Rotas Privadas (req.user estará disponível aqui)
+/**
+ * ROTAS PRIVADAS (USUÁRIO COMUM)
+ * O req.user já estará disponível aqui
+ */
 router.get('/me', streamerController.getMyStream);
 router.patch('/me/go-live', streamerController.goLive);
 router.patch('/me/go-offline', streamerController.goOffline);
+
+// Rota de perfil (exemplo de uso individual)
+// Note: Removi o "protect" e usei "authenticate" que é o nome real no seu auth.js
+router.get('/perfil', authenticate, (req, res) => {
+    res.json({ success: true, user: req.user });
+});
+
+/**
+ * ROTAS ADMINISTRATIVAS
+ * Exemplo de uso do middleware de autorização por cargo (role)
+ */
+// Apenas usuários com a role 'admin' podem deletar
+router.delete('/usuario/:id', authorize('admin'), (req, res) => {
+    // Lógica para deletar usuário aqui
+    res.json({ success: true, message: 'Usuário deletado' });
+});
 
 module.exports = router;
