@@ -1,8 +1,7 @@
 'use strict';
-// IMPORTANTE: Deve ser exatamente o nome do arquivo no GitHub
 const Streamer = require('./Streamer'); 
 
-// LISTAR STREAMERS AO VIVO
+// LISTAR STREAMERS AO VIVO (Público)
 exports.getLiveStreamers = async (req, res) => {
   try {
     const streamers = await Streamer.find({ isLive: true })
@@ -10,27 +9,24 @@ exports.getLiveStreamers = async (req, res) => {
       .sort({ planPriority: -1 })
       .lean();
 
-    const formattedStreamers = streamers.map(s => {
-      return {
-        ...s,
-        username: s.user?.liveNick || s.user?.nickname || "canal"
-      };
-    });
+    const formattedStreamers = streamers.map(s => ({
+      ...s,
+      username: s.user?.liveNick || s.user?.nickname || "canal"
+    }));
 
-    return res.json({
-      success: true,
-      data: formattedStreamers
-    });
+    return res.json({ success: true, data: formattedStreamers });
   } catch (err) {
-    console.error('Erro ao formatar streamers:', err);
-    return res.status(500).json({ success: false });
+    console.error('Erro ao buscar streamers:', err);
+    return res.status(500).json({ success: false, message: 'Erro interno no servidor' });
   }
 };
 
-// ESSA FUNÇÃO ESTAVA FALTANDO E POR ISSO DAVA ERRO NO RENDER
+// BUSCAR MINHA LIVE (Privado)
 exports.getMyStream = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Usuário não identificado' });
+
     const streamer = await Streamer.findOne({ user: userId }).lean();
     return res.json({ success: true, data: streamer });
   } catch (err) {
@@ -38,21 +34,18 @@ exports.getMyStream = async (req, res) => {
   }
 };
 
-// GO LIVE (Lógica Definitiva)
+// FICAR ONLINE (Lógica Definitiva)
 exports.goLive = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: 'Não autorizado' });
+      return res.status(401).json({ success: false, message: 'Não autorizado: Token inválido ou ausente' });
     }
 
     const streamer = await Streamer.findOneAndUpdate(
       { user: userId },
-      { 
-        isLive: true, 
-        lastWentLive: new Date() 
-      },
+      { isLive: true, lastWentLive: new Date() },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
@@ -62,7 +55,7 @@ exports.goLive = async (req, res) => {
       data: streamer 
     });
   } catch (err) {
-    console.error('ERRO NO RENDER AO FICAR ONLINE:', err);
+    console.error('ERRO AO FICAR ONLINE:', err);
     return res.status(500).json({ 
       success: false, 
       message: 'Erro ao iniciar live',
@@ -71,11 +64,15 @@ exports.goLive = async (req, res) => {
   }
 };
 
-// GO OFFLINE
+// FICAR OFFLINE (Adicionado verificação de segurança)
 exports.goOffline = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     
+    if (!userId) {
+        return res.status(401).json({ success: false, message: 'Não autorizado' });
+    }
+
     await Streamer.findOneAndUpdate(
       { user: userId },
       { isLive: false }
@@ -83,11 +80,9 @@ exports.goOffline = async (req, res) => {
 
     return res.json({ success: true, message: 'Status: Offline' });
   } catch (err) {
+    console.error('ERRO AO FICAR OFFLINE:', err);
     return res.status(500).json({ success: false });
   }
 };
 
-// DRAIN TOKENS
-exports.drainTokens = async (req, res) => {
-  return res.json({ success: true });
-};
+exports.drainTokens = async (req, res) => res.json({ success: true });
