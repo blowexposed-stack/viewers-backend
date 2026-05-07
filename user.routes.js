@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const streamerController = require('./streamer.controller');
-const { protect } = require('./auth.middleware'); // Mantenha a proteção!
+const { protect } = require('./auth');
 
 // 1. Rota que TODOS podem ver (Pública)
 router.get('/', streamerController.getLiveStreamers);
