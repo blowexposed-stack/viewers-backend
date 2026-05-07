@@ -9,7 +9,10 @@ const authMiddleware = require('./auth');
 
 // Verifica se 'protect' existe dentro do arquivo importado, 
 // senão tenta usar o arquivo importado diretamente como a função de proteção.
-const protect = authMiddleware.protect || authMiddleware;
+import { protect } from '../middlewares/authMiddleware.js';
+
+// Uso direto:
+router.get('/perfil', protect, getUserProfile);
 
 // 1. Rota Pública
 router.get('/', streamerController.getLiveStreamers);
