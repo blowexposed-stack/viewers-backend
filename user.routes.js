@@ -9,8 +9,13 @@ const authMiddleware = require('./auth');
 
 // Verifica se 'protect' existe dentro do arquivo importado, 
 // senão tenta usar o arquivo importado diretamente como a função de proteção.
-import { protect } from '../middlewares/authMiddleware.js';
+const { authenticate, authorize } = require('./auth'); // Importando como objeto
 
+// Exemplo de uso na linha 12 e além
+r.use(authenticate); 
+
+// Se quiser proteger uma rota apenas para admins:
+r.delete('/usuario/:id', authorize('admin'), controller.deleteUser);
 // Uso direto:
 router.get('/perfil', protect, getUserProfile);
 
